@@ -40,6 +40,8 @@ rm -f "$(dirname "$(which node)")/tsaver"   # removes a leftover dangling symlin
 
 **Full reference, every flag and default, troubleshooting**: see [`docs/USAGE.md`](docs/USAGE.md) or open [`docs/index.html`](docs/index.html) in a browser.
 
+**Does it actually save tokens?** See [`docs/token-savings-report.html`](docs/token-savings-report.html) — six real, reproducible benchmarks with exact before/after numbers, including the one case (object-keyed JSON) where it currently makes things worse.
+
 ## License
 
 ISC

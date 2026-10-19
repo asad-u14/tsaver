@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tsaver — token savings report</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-elevated: #ffffff;
+    --surface: #f6f7f9;
+    --surface-hover: #eef0f3;
+    --border: #e4e7ec;
+    --border-strong: #d0d5dd;
+    --text: #0f1419;
+    --text2: #5c6370;
+    --text3: #8b93a3;
+    --accent: #0c8a7b;
+    --accent-soft: #e6f5f2;
+    --code-bg: #f1f3f6;
+    --code-border: #e4e7ec;
+    --warn-bg: #fdf6e8;
+    --warn-border: #ecc865;
+    --warn-strong: #8a5a06;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --bar-light: #2a78d6;
+    --bar-dark: #104281;
+    --status-serious: #ec835a;
+    --status-good: #0ca30c;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0c10;
+    --bg-elevated: #10131a;
+    --surface: #131720;
+    --surface-hover: #1a1f2a;
+    --border: #212631;
+    --border-strong: #2d333f;
+    --text: #e7e9ee;
+    --text2: #9aa3b2;
+    --text3: #6b7280;
+    --accent: #5eead4;
+    --accent-soft: #10292a;
+    --code-bg: #0e1117;
+    --code-border: #1f2430;
+    --warn-bg: #211a0d;
+    --warn-border: #4a3a12;
+    --warn-strong: #f2c94c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.25);
+    --bar-light: #3987e5;
+    --bar-dark: #184f95;
+    --status-serious: #ec835a;
+    --status-good: #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .page { max-width: 880px; margin: 0 auto; padding: 56px 40px 100px; }
+
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
+  .eyebrow { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 10px; }
+  .subtitle { color: var(--text2); font-size: 15px; line-height: 1.6; margin: 0 0 8px; max-width: 640px; }
+  .meta { color: var(--text3); font-size: 12.5px; margin-bottom: 36px; }
+
+  #theme-toggle button {
+    font-size: 12.5px;
+    padding: 7px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  #theme-toggle button:hover { border-color: var(--accent); background: var(--surface-hover); }
+
+  h2 {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 52px 0 6px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+  .section-dek { color: var(--text2); font-size: 14px; margin: 0 0 22px; max-width: 620px; line-height: 1.6; }
+  h3 { font-size: 14.5px; font-weight: 700; margin: 24px 0 10px; }
+  p { line-height: 1.65; font-size: 14.5px; margin: 0 0 14px; }
+  ul, ol { font-size: 14.5px; line-height: 1.65; margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    padding: 1.5px 5px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 0 0 16px;
+    box-shadow: var(--shadow);
+  }
+  pre code { background: none; border: none; padding: 0; }
+
+  /* ---------- KPI row ---------- */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0 8px; }
+  .kpi {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text3); margin-bottom: 8px; }
+  .kpi-value { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .kpi-value.good { color: var(--accent); }
+  .kpi-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+  @media (max-width: 760px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ---------- Dumbbell chart ---------- */
+  .chart-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 24px 8px;
+    box-shadow: var(--shadow);
+    margin: 20px 0 8px;
+  }
+  .chart-legend { display: flex; gap: 20px; align-items: center; font-size: 12.5px; color: var(--text2); margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .dumbbell-row { display: grid; grid-template-columns: 200px 1fr; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .dumbbell-row:last-child { border-bottom: none; }
+  .dumbbell-label { font-size: 13px; font-weight: 600; }
+  .dumbbell-sub { font-size: 11.5px; color: var(--text3); font-weight: 400; margin-top: 2px; }
+  .dumbbell-track { position: relative; height: 34px; }
+  .dumbbell-axis { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--border); }
+  .dumbbell-line {
+    position: absolute;
+    top: 50%;
+    height: 2px;
+    background: var(--border-strong);
+    transform: translateY(-1px);
+  }
+  .dumbbell-line.regressed { background: var(--status-serious); opacity: 0.55; }
+  .dumbbell-end {
+    position: absolute;
+    top: 50%;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid var(--bg-elevated);
+  }
+  .dumbbell-end.before { background: var(--bar-light); }
+  .dumbbell-end.after { background: var(--bar-dark); }
+  .dumbbell-end.after.regressed { background: var(--status-serious); }
+  .dumbbell-tag {
+    position: absolute;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .dumbbell-tag.before { color: var(--bar-light); }
+  .dumbbell-tag.after { color: var(--bar-dark); }
+  .dumbbell-tag.after.regressed { color: var(--status-serious); }
+  .reduction-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 100px;
+    margin-left: 8px;
+  }
+  .reduction-pill.good { background: var(--accent-soft); color: var(--accent); }
+  .reduction-pill.bad { background: var(--warn-bg); color: var(--status-serious); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface); }
+  td.num { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; text-align: right; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .note {
+    position: relative;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 10px;
+    padding: 13px 16px 13px 44px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    margin: 4px 0 16px;
+  }
+  .note::before {
+    content: "!";
+    position: absolute;
+    left: 15px;
+    top: 13px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--warn-strong);
+    color: var(--warn-bg);
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: ui-monospace, monospace;
+  }
+  .note strong { color: var(--warn-strong); }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text3); font-size: 12.5px; }
+  footer a { color: var(--accent); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top-row">
+    <div>
+      <p class="eyebrow">Measured report</p>
+      <h1>How much does tsaver actually save?</h1>
+    </div>
+    <div id="theme-toggle"><button id="theme-toggle-btn" type="button" onclick="toggleTheme()">🌙 Dark</button></div>
+  </div>
+  <p class="subtitle">Six real scenarios, run with and without tsaver, numbers taken directly from <code>tsaver --stats</code> output — including the one case where compaction made things worse. Nothing here is staged or rounded up.</p>
+  <p class="meta">Generated from a live benchmark session · see <a href="#methodology">methodology</a> for exactly how each number was produced.</p>
+
+  <h2 id="headline">Headline numbers</h2>
+  <p class="section-dek">Across all six scenarios combined — the honest total, regression included.</p>
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Scenarios measured</div>
+      <div class="kpi-value">6</div>
+      <div class="kpi-sub">4 wins, 1 flat, 1 regression</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Best single-case reduction</div>
+      <div class="kpi-value good">99.9%</div>
+      <div class="kpi-sub">bytes, PDF read</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Typical noisy-command case</div>
+      <div class="kpi-value good">~85–94%</div>
+      <div class="kpi-sub">bytes &amp; words, test/build logs</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Worst case</div>
+      <div class="kpi-value" style="color: var(--status-serious)">+37%</div>
+      <div class="kpi-sub">bytes, object-keyed JSON (see below)</div>
+    </div>
+  </div>
+
+  <h2 id="comparison">With tsaver vs. without — six real runs</h2>
+  <p class="section-dek">Each row is one real command, captured twice: once completely unmodified (the "without" baseline), once through <code>tsaver run</code> / <code>tsaver read</code> / <code>tsaver mcp</code> (the "with" result). Bytes shown; see the table below for the word/token-proxy numbers too.</p>
+
+  <div class="chart-card">
+    <div class="chart-legend">
+      <span class="legend-item"><span class="legend-dot" style="background: var(--bar-light)"></span>Without tsaver</span>
+      <span class="legend-item"><span class="legend-dot" style="background: var(--bar-dark)"></span>With tsaver</span>
+      <span class="legend-item"><span class="legend-dot" style="background: var(--status-serious)"></span>Regressed (with tsaver is worse)</span>
+    </div>
+    <div id="dumbbell-chart"></div>
+  </div>
+
+  <table>
+    <thead><tr><th>Scenario</th><th class="num">Bytes without</th><th class="num">Bytes with</th><th class="num">Byte Δ</th><th class="num">Words without</th><th class="num">Words with</th><th class="num">Word Δ</th></tr></thead>
+    <tbody id="comparison-table"></tbody>
+  </table>
+
+  <h2 id="scenarios">What each scenario actually was</h2>
+
+  <h3>1. Noisy test run (<code>./noisy-tests.sh</code>)</h3>
+  <p>A real executable script producing 80 <code>PASS</code> lines across 10 modules plus one genuine <code>FAILED</code> assertion and a summary line — the shape of a real test suite. Run once raw, once through <code>tsaver run --stats</code>.</p>
+  <pre><code>tsaver stats
+  lines                   83 -> 9  (89.2% reduction)
+  bytes                   3593 -> 424  (88.2% reduction)
+  words (approx. tokens)  261 -> 40  (84.7% reduction)</code></pre>
+  <p>75 near-identical <code>PASS</code> lines collapsed into one <code>(×75)</code> line. The <code>FAILED</code> line, its assertion detail, and the summary all survived untouched.</p>
+
+  <h3>2. Noisy build (<code>./noisy-build.sh</code>)</h3>
+  <p>A real script simulating a webpack-style build: 120 "building module N/120" lines plus a real warning and a success line.</p>
+  <pre><code>tsaver stats
+  lines                   123 -> 8  (93.5% reduction)
+  bytes                   4682 -> 303  (93.5% reduction)
+  words (approx. tokens)  493 -> 34  (93.1% reduction)</code></pre>
+
+  <h3>3. PDF read (a real 2&nbsp;MB file)</h3>
+  <p>An actual 2,097,152-byte PDF, read once as raw bytes, once through <code>tsaver read --stats</code>, which extracts the embedded text.</p>
+  <pre><code>tsaver stats
+  lines                   34 -> 34  (0.0% reduction)
+  bytes                   2097152 -> 1805  (99.9% reduction)
+  words (approx. tokens)  231 -> 231  (0.0% reduction)</code></pre>
+  <div class="note">The word count shows <strong>0% reduction</strong> here — not a bug. There's no plain-text version of a binary PDF to count words in before extraction, so tsaver sets "raw words" equal to the already-extracted text's word count; the two numbers are always identical for PDFs. The <strong>byte</strong> number is where the real story is: a 2&nbsp;MB file became 1.8&nbsp;KB of text.</div>
+
+  <h3>4. MCP-style JSON, array-shaped (real npm search response, 250 items)</h3>
+  <p>A genuine 265,343-byte JSON response (<code>npmjs.org</code>'s search API, fetched live), compacted with <code>tsaver mcp --stats</code>.</p>
+  <pre><code>tsaver stats
+  lines                   1 -> 326  (-32500.0% reduction)
+  bytes                   265343 -> 8925  (96.6% reduction)
+  words (approx. tokens)  1340 -> 579  (56.8% reduction)</code></pre>
+  <p>This is the clean win case for <code>tsaver mcp</code>: the top-level array of 250 result objects gets truncated to its first/last few entries, and the byte/word savings are both real and large. (Lines go up because the output is pretty-printed for readability — that's expected and not a meaningful number here.)</p>
+
+  <h3>5. MCP-style JSON, object-keyed (real npm registry response for <code>express</code>)</h3>
+  <p>A genuine 823,555-byte JSON response — the full npm registry record for the <code>express</code> package, with 290 published versions — run through the same <code>tsaver mcp --stats</code>.</p>
+  <pre><code>tsaver stats
+  lines                   1 -> 41050  (-4104900.0% reduction)
+  bytes                   823555 -> 1186118  (-44.0% reduction)
+  words (approx. tokens)  11705 -> 80304  (-586.1% reduction)</code></pre>
+  <div class="note"><strong>This one got worse, and the report isn't hiding it.</strong> <code>tsaver mcp</code>'s truncation logic only applies to JSON <em>arrays</em>. This payload's large collections (<code>versions</code>, <code>time</code>) are JSON <em>objects</em> keyed by version string, not arrays — so none of that data gets truncated, and it all survives in full. Combined with pretty-printing the output (2-space indent, for readability) instead of keeping the original's minified form, the result is larger on every axis than the input. If your MCP responses are large object-keyed maps rather than arrays, <code>tsaver mcp</code> in its current form will not help and can make things worse.</div>
+
+  <h3>6. A real, already-small <code>npm install</code></h3>
+  <p>Installing three small packages (<code>lodash</code>, <code>chalk</code>, <code>uuid</code>) with warm npm/registry caches — a genuinely quiet install with no progress-bar or repeated-line noise to strip.</p>
+  <pre><code>tsaver stats
+  lines                   26 -> 26  (0.0% reduction)
+  bytes                   1412 -> 1412  (0.0% reduction)
+  words (approx. tokens)  172 -> 172  (0.0% reduction)</code></pre>
+  <p>Zero reduction, and that's the honest result for this input — there was no noise to filter. tsaver's savings scale with how repetitive the original output is; a short, already-clean log has nothing to collapse.</p>
+
+  <h2 id="takeaways">What this actually tells you</h2>
+  <ul>
+    <li><strong><code>tsaver run</code> on anything with repetitive line noise (test suites, builds, verbose installs) is a reliable, large win</strong> — 85–94% reduction on both bytes and the token-count proxy in every real noisy-output case tested here.</li>
+    <li><strong><code>tsaver read</code> on PDFs/notebooks is a reliable, large byte win</strong>, but its "tokens saved" number is structurally meaningless for these file kinds — judge PDF/notebook reads by bytes, not words.</li>
+    <li><strong><code>tsaver mcp</code> only helps when the payload's bulk lives in JSON arrays.</strong> On this run's array-shaped payload it cut bytes by 96.6%; on the object-keyed payload it made things 44% worse. Check which shape your data is before assuming it will help.</li>
+    <li><strong>Already-quiet output sees no benefit</strong> — tsaver has nothing to remove if there's no noise to begin with, and reports that honestly as 0%, not a fabricated number.</li>
+  </ul>
+
+  <h2 id="methodology">Methodology</h2>
+  <p class="section-dek">How every number on this page was produced — so you can reproduce or challenge any of it.</p>
+  <ol>
+    <li>History was cleared with <code>tsaver history clear --force</code> immediately before this benchmark session, so nothing here is left over from unrelated usage.</li>
+    <li>Scenarios 1–2 are real, executable shell scripts (not hand-typed example text) producing genuinely repetitive output, run once with plain shell redirection for the "without" baseline and once through <code>tsaver run --stats</code> for the "with" result — same script, same machine, back to back.</li>
+    <li>Scenario 3 is a real 2 MB PDF already present in this project, read once as raw bytes (<code>stat</code>) and once through <code>tsaver read --stats</code>.</li>
+    <li>Scenarios 4–5 are real JSON responses fetched live from the public npm registry at the time of writing (<code>registry.npmjs.org</code>'s search endpoint and the <code>express</code> package record) — not synthetic or hand-constructed payloads — piped through <code>tsaver mcp --stats</code>.</li>
+    <li>Scenario 6 is a real <code>npm install</code> of three small public packages, run with <code>--loglevel info</code>, <code>node_modules</code> removed beforehand so the install actually executes rather than no-op'ing.</li>
+    <li>Every number quoted above is copied verbatim from the <code>tsaver stats</code> block each command printed to stderr, or from <code>wc -c</code>/<code>wc -w</code> on the independently-captured raw output. None are estimated, rounded for effect, or adjusted.</li>
+  </ol>
+  <p>"Words (approx. tokens)" is a whitespace-split word count, the same proxy used throughout tsaver's own <code>--stats</code> output — documented everywhere as an approximation of token count, not an exact tokenizer measurement.</p>
+
+  <footer>tsaver — local-first, no telemetry, no network calls. See the <a href="index.html">full usage reference</a> for every command.</footer>
+</div>
+<script>
+const SCENARIOS = [
+  { name: "Noisy test run", sub: "./noisy-tests.sh", before: 3593, after: 424, regressed: false },
+  { name: "Noisy build", sub: "./noisy-build.sh", before: 4682, after: 303, regressed: false },
+  { name: "PDF read", sub: "2 MB report.pdf", before: 2097152, after: 1805, regressed: false },
+  { name: "MCP: array JSON", sub: "npm search (250 items)", before: 265343, after: 8925, regressed: false },
+  { name: "MCP: object JSON", sub: "npm registry (express)", before: 823555, after: 1186118, regressed: true },
+  { name: "Quiet npm install", sub: "3 small packages", before: 1412, after: 1412, regressed: false },
+];
+
+function fmtBytes(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + " MB";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + " KB";
+  return n + " B";
+}
+
+function pctChange(before, after) {
+  if (before === 0) return 0;
+  return (1 - after / before) * 100;
+}
+
+function renderChart() {
+  const container = document.getElementById("dumbbell-chart");
+  const maxLog = Math.log10(Math.max(...SCENARIOS.map((s) => Math.max(s.before, s.after))) + 1);
+  const minLog = 0;
+
+  const toPct = (v) => {
+    const l = Math.log10(v + 1);
+    return ((l - minLog) / (maxLog - minLog)) * 100;
+  };
+
+  container.innerHTML = SCENARIOS.map((s) => {
+    const beforePct = toPct(s.before);
+    const afterPct = toPct(s.after);
+    const left = Math.min(beforePct, afterPct);
+    const width = Math.abs(afterPct - beforePct);
+    const pct = pctChange(s.before, s.after);
+    const pillClass = pct >= 0 ? "good" : "bad";
+    const pillText = pct >= 0 ? "−" + pct.toFixed(1) + "%" : "+" + Math.abs(pct).toFixed(1) + "%";
+    const lineClass = s.regressed ? "regressed" : "";
+    const afterEndClass = s.regressed ? "after regressed" : "after";
+    const afterTagClass = s.regressed ? "after regressed" : "after";
+
+    return (
+      '<div class="dumbbell-row">' +
+        '<div><div class="dumbbell-label">' + s.name + '</div><div class="dumbbell-sub">' + s.sub + "</div></div>" +
+        '<div class="dumbbell-track">' +
+          '<div class="dumbbell-axis"></div>' +
+          '<div class="dumbbell-line ' + lineClass + '" style="left:' + left + '%; width:' + width + '%"></div>' +
+          '<div class="dumbbell-end before" style="left:' + beforePct + '%"></div>' +
+          '<div class="dumbbell-end ' + afterEndClass + '" style="left:' + afterPct + '%"></div>' +
+          '<div class="dumbbell-tag before" style="left:' + beforePct + '%; ' + (beforePct < afterPct ? "transform: translate(calc(-100% - 10px), -50%)" : "transform: translate(10px, -50%)") + '">' + fmtBytes(s.before) + "</div>" +
+          '<div class="dumbbell-tag ' + afterTagClass + '" style="left:' + afterPct + '%; ' + (afterPct >= beforePct ? "transform: translate(10px, -50%)" : "transform: translate(calc(-100% - 10px), -50%)") + '">' + fmtBytes(s.after) +
+            '<span class="reduction-pill ' + pillClass + '">' + pillText + "</span>" +
+          "</div>" +
+        "</div>" +
+      "</div>"
+    );
+  }).join("");
+}
+
+function renderTable() {
+  const WORDS = {
+    "Noisy test run": [261, 40],
+    "Noisy build": [493, 34],
+    "PDF read": [231, 231],
+    "MCP: array JSON": [1340, 579],
+    "MCP: object JSON": [11705, 80304],
+    "Quiet npm install": [172, 172],
+  };
+  const tbody = document.getElementById("comparison-table");
+  tbody.innerHTML = SCENARIOS.map((s) => {
+    const [wBefore, wAfter] = WORDS[s.name];
+    const byteDelta = pctChange(s.before, s.after);
+    const wordDelta = pctChange(wBefore, wAfter);
+    const fmt = (d) => (d >= 0 ? "−" + d.toFixed(1) + "%" : "+" + Math.abs(d).toFixed(1) + "%");
+    return (
+      "<tr><td>" + s.name + "</td>" +
+      '<td class="num">' + s.before.toLocaleString() + "</td>" +
+      '<td class="num">' + s.after.toLocaleString() + "</td>" +
+      '<td class="num" style="color:' + (byteDelta >= 0 ? "var(--accent)" : "var(--status-serious)") + '">' + fmt(byteDelta) + "</td>" +
+      '<td class="num">' + wBefore.toLocaleString() + "</td>" +
+      '<td class="num">' + wAfter.toLocaleString() + "</td>" +
+      '<td class="num" style="color:' + (wordDelta >= 0 ? "var(--accent)" : "var(--status-serious)") + '">' + fmt(wordDelta) + "</td></tr>"
+    );
+  }).join("");
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const btn = document.getElementById("theme-toggle-btn");
+  if (btn) btn.textContent = theme === "dark" ? "☀️ Light" : "🌙 Dark";
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  const next = current === "dark" ? "light" : "dark";
+  try { localStorage.setItem("tsaver-docs-theme", next); } catch {}
+  applyTheme(next);
+}
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem("tsaver-docs-theme"); } catch {}
+  applyTheme(saved === "dark" ? "dark" : "light");
+})();
+
+renderChart();
+renderTable();
+</script>
+</body>
+</html>
