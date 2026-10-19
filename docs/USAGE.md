@@ -79,7 +79,10 @@ Spawns `<command>`, captures stdout/stderr, and streams each line through a **fi
 - If the process exits non-zero, appends any of the last-20-window lines that weren't already emitted, under a `--- last lines before exit (non-zero exit code) ---` marker — so failure context is never silently dropped.
 
 ### `pytest` profile
-Keeps lines starting with `FAILED`, `ERROR`, `E ` (assertion detail), and the summary line (`== N failed, M passed ==`). Collapses passing-test dots/`PASSED` lines into a single `N passed` (or `(N passing tests collapsed)`) note.
+- Drops the entire startup banner (`test session starts`, `platform`, `rootdir`, `configfile`, `plugins`, `collected N items`) — none of it is test-specific signal.
+- Recognizes pytest's real default-mode progress lines (a file path followed by status characters and an optional `[ NN%]` marker, e.g. `tests/test_auth.py .......... [ 14%]`) and collapses them, along with `PASSED` lines, into a single `N passed` (or `(N passing tests collapsed)`) note.
+- Keeps lines starting with `FAILED`, `ERROR`, `E ` (assertion detail), and the summary line (`N failed, M passed`) — with the `===`/`___` decoration around section headers and summaries stripped to just the label, and blank lines orphaned by a drop removed.
+- A real pytest example (25 lines) reduces to 12 lines / 71.1% fewer bytes with this filter — see the [Boost comparison report](boost-comparison-report.html) for a verified line-by-line diff against a published reference output.
 
 ### `npm` profile
 Keeps `npm error`/`npm ERR!`/`npm warn`/install-summary lines and anything matching `error|fail`. Drops `npm notice`/`npm timing`/spinner lines. Appends a marker if the process exits non-zero.

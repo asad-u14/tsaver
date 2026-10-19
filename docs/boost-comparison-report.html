@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tsaver vs. JFrog Boost — comparison report</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-elevated: #ffffff;
+    --surface: #f6f7f9;
+    --surface-hover: #eef0f3;
+    --border: #e4e7ec;
+    --border-strong: #d0d5dd;
+    --text: #0f1419;
+    --text2: #5c6370;
+    --text3: #8b93a3;
+    --accent: #0c8a7b;
+    --accent-soft: #e6f5f2;
+    --code-bg: #f1f3f6;
+    --code-border: #e4e7ec;
+    --warn-bg: #fdf6e8;
+    --warn-border: #ecc865;
+    --warn-strong: #8a5a06;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --good: #0ca30c;
+    --status-serious: #ec835a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0c10;
+    --bg-elevated: #10131a;
+    --surface: #131720;
+    --surface-hover: #1a1f2a;
+    --border: #212631;
+    --border-strong: #2d333f;
+    --text: #e7e9ee;
+    --text2: #9aa3b2;
+    --text3: #6b7280;
+    --accent: #5eead4;
+    --accent-soft: #10292a;
+    --code-bg: #0e1117;
+    --code-border: #1f2430;
+    --warn-bg: #211a0d;
+    --warn-border: #4a3a12;
+    --warn-strong: #f2c94c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.25);
+    --good: #0ca30c;
+    --status-serious: #ec835a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .page { max-width: 880px; margin: 0 auto; padding: 56px 40px 100px; }
+
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
+  .eyebrow { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 27px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 10px; }
+  .subtitle { color: var(--text2); font-size: 15px; line-height: 1.6; margin: 0 0 8px; max-width: 660px; }
+  .meta { color: var(--text3); font-size: 12.5px; margin-bottom: 36px; }
+
+  #theme-toggle button {
+    font-size: 12.5px; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--text); cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  #theme-toggle button:hover { border-color: var(--accent); background: var(--surface-hover); }
+
+  h2 {
+    font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin: 52px 0 6px;
+    padding-top: 20px; border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+  .section-dek { color: var(--text2); font-size: 14px; margin: 0 0 22px; max-width: 620px; line-height: 1.6; }
+  h3 { font-size: 14.5px; font-weight: 700; margin: 24px 0 10px; }
+  p { line-height: 1.65; font-size: 14.5px; margin: 0 0 14px; }
+  ul, ol { font-size: 14.5px; line-height: 1.65; margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg); border: 1px solid var(--code-border);
+    padding: 1.5px 5px; border-radius: 4px; font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 12px; line-height: 1.55; margin: 0 0 16px; box-shadow: var(--shadow);
+  }
+  pre code { background: none; border: none; padding: 0; }
+  a { color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 16px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text3); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.center { text-align: center; }
+
+  .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; }
+  .pill.yes { background: var(--accent-soft); color: var(--accent); }
+  .pill.partial { background: var(--warn-bg); color: var(--warn-strong); }
+  .pill.no { background: var(--surface); color: var(--text3); }
+
+  .diff-card {
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 22px; box-shadow: var(--shadow); margin: 20px 0;
+  }
+  .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .diff-grid { grid-template-columns: 1fr; } }
+  .diff-col-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text3); margin-bottom: 8px; }
+  .diff-added { color: var(--status-serious); }
+
+  .note {
+    position: relative; background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px;
+    padding: 13px 16px 13px 44px; font-size: 13.5px; line-height: 1.6; margin: 4px 0 16px;
+  }
+  .note::before {
+    content: "!"; position: absolute; left: 15px; top: 13px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--warn-strong); color: var(--warn-bg); font-size: 12px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace;
+  }
+  .note strong { color: var(--warn-strong); }
+
+  .fixed-note {
+    position: relative; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px;
+    padding: 13px 16px 13px 44px; font-size: 13.5px; line-height: 1.6; margin: 4px 0 16px;
+  }
+  .fixed-note::before {
+    content: "✓"; position: absolute; left: 15px; top: 13px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); color: var(--bg-elevated); font-size: 11px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .fixed-note strong { color: var(--accent); }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text3); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top-row">
+    <div>
+      <p class="eyebrow">Comparison report</p>
+      <h1>tsaver vs. JFrog Boost</h1>
+    </div>
+    <div id="theme-toggle"><button id="theme-toggle-btn" type="button" onclick="toggleTheme()">🌙 Dark</button></div>
+  </div>
+  <p class="subtitle">A head-to-head check against <a href="https://github.com/jfrog/boost" target="_blank" rel="noopener">JFrog Boost</a>, the tool tsaver was originally inspired by. This includes a real bug the comparison surfaced in tsaver's pytest filter — found, fixed, and verified, not glossed over.</p>
+  <p class="meta">Boost's internals are closed-source (compiled Go binary, no public source repo) — this comparison is built from Boost's own published documentation and README, plus direct, reproducible runs of tsaver.</p>
+
+  <h2 id="headline">The headline result</h2>
+  <div class="diff-card">
+    <p style="margin-bottom: 4px;"><strong>Same input, same tool category (pytest), compared directly.</strong></p>
+    <p style="margin-bottom: 0;">Boost's own README publishes a real before/after pytest example: 25 raw lines → 11 filtered lines, "same failure, same traceback, same summary." Run through tsaver's pytest filter <em>before</em> this comparison, that exact input produced <strong>0% reduction</strong> — a real bug. Fixed during this comparison, tsaver now produces <strong>25 → 12 lines</strong> on the identical input, and a line-by-line diff against Boost's own published output shows the two are identical except for one extra informational line tsaver adds on purpose.</p>
+  </div>
+
+  <h2 id="pytest-deep-dive">The pytest deep dive</h2>
+  <p class="section-dek">Boost's README includes one fully worked, quotable example. That makes it the one place a direct, reproducible comparison is possible — so this section goes deep on it.</p>
+
+  <h3>The exact input (Boost's own published example)</h3>
+  <pre><code>============================= test session starts ==============================
+platform darwin -- Python 3.12.4, pytest-8.3.2, pluggy-1.5.0
+rootdir: /Users/dev/shop-api
+configfile: pyproject.toml
+plugins: anyio-4.4.0, cov-5.0.0, asyncio-0.23.8, mock-3.14.0
+collected 214 items
+
+tests/test_auth.py ..............................                         [ 14%]
+tests/test_cart.py ..........................................             [ 33%]
+tests/test_catalog.py ....................................                [ 50%]
+tests/test_checkout.py ...................F..........                     [ 64%]
+tests/test_inventory.py ..............................                    [ 78%]
+tests/test_orders.py ..............................................       [100%]
+
+=================================== FAILURES ===================================
+__________________________ test_applies_discount_code __________________________
+
+    def test_applies_discount_code():
+        cart = Cart(items=[Item(price=100)])
+&gt;       assert cart.total(code="SAVE10") == 90
+E       assert 100 == 90
+tests/test_checkout.py:42: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_checkout.py::test_applies_discount_code - assert 100 == 90
+======================== 1 failed, 213 passed in 4.81s =========================</code></pre>
+  <p>25 lines, 1,366 bytes, 91 words.</p>
+
+  <h3>What tsaver originally did with it — a real bug</h3>
+  <p>Before this comparison, running that exact input through <code>tsaver run -- pytest</code> produced:</p>
+  <pre><code>tsaver stats
+  lines                   25 -> 25  (0.0% reduction)
+  bytes                   1366 -> 1366  (0.0% reduction)
+  words (approx. tokens)  91 -> 91  (0.0% reduction)</code></pre>
+  <div class="note"><strong>Root cause:</strong> tsaver's pytest filter looked for a bare line of dots (<code>/^[.\s]*$/</code>) to recognize passing-test progress output. Real pytest's default format prefixes each progress line with the file path and suffixes it with a percentage — <code>tests/test_auth.py .............. [ 14%]</code> — which never matches a dots-only pattern. Every progress line, and the entire startup banner, fell through to "keep as-is."</div>
+
+  <h3>The fix</h3>
+  <p>Three changes to <code>src/filters/pytest.ts</code>, in order of how much they contributed:</p>
+  <ol>
+    <li><strong>Progress-line matching</strong> now recognizes the real pytest format (file path + status characters + optional percentage), not just bare dots.</li>
+    <li><strong>Startup banner dropping</strong> — the "test session starts" line, <code>platform</code>, <code>rootdir</code>, <code>configfile</code>, <code>plugins</code>, and <code>collected N items</code> lines are now dropped entirely, matching Boost's documented behavior ("drops: banner, plugins, progress dots").</li>
+    <li><strong>Decoration stripping</strong> on kept header/summary lines — <code>=== FAILURES ===</code> becomes <code>FAILURES</code>, matching the padding-free style of Boost's published output — plus suppressing blank lines left orphaned by a drop, without touching genuine blank lines that follow kept content.</li>
+  </ol>
+
+  <h3>The result, verified by direct diff</h3>
+  <pre><code>tsaver stats
+  lines                   25 -> 12  (52.0% reduction)
+  bytes                   1366 -> 395  (71.1% reduction)
+  words (approx. tokens)  91 -> 40  (56.0% reduction)</code></pre>
+
+  <div class="diff-card">
+    <div class="diff-col-label">diff between tsaver's output and Boost's own published "after" example</div>
+    <pre><code>  FAILURES
+  test_applies_discount_code
+
+      def test_applies_discount_code():
+          cart = Cart(items=[Item(price=100)])
+  &gt;       assert cart.total(code="SAVE10") == 90
+  E       assert 100 == 90
+  tests/test_checkout.py:42: AssertionError
+  short test summary info
+  FAILED tests/test_checkout.py::test_applies_discount_code - assert 100 == 90
+  1 failed, 213 passed in 4.81s
+<span class="diff-added">+ (219 passing tests collapsed)</span></code></pre>
+  </div>
+  <div class="fixed-note"><strong>Every line of actual signal matches exactly.</strong> The single difference is one line tsaver adds on purpose — a count of how many passing tests were collapsed, which Boost's example doesn't show. That's a deliberate design choice (visibility into what was removed), not a defect.</div>
+
+  <h2 id="feature-matrix">Feature-by-feature</h2>
+  <p class="section-dek">Based on Boost's published README and documentation (its filtering engine is a closed-source compiled binary, so internal thresholds/algorithms beyond what's documented can't be independently verified).</p>
+  <table>
+    <thead><tr><th>Capability</th><th class="center">Boost</th><th class="center">tsaver</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Terminal output filtering</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td>Boost claims "100+ tools" with built-in profiles; tsaver ships <code>pytest</code>/<code>npm</code> profiles plus a generic fallback. Verified equivalent on the one example Boost publishes in full (above).</td>
+      </tr>
+      <tr>
+        <td>Custom per-tool filters</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td>Both use TOML files. Both offer a "gaps" command (<code>boost filters gaps</code> / <code>tsaver filters gaps</code>) that ranks noisy commands still falling through unfiltered.</td>
+      </tr>
+      <tr>
+        <td>MCP response compaction</td>
+        <td class="center"><span class="pill partial">Staged rollout</span></td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td>Boost's own docs flag this feature as not fully available yet. tsaver's version works today, but — per <a href="token-savings-report.html">the token savings report</a> — only helps when the payload's bulk is in JSON arrays; object-keyed JSON isn't truncated and can come out larger due to pretty-printing. Boost gives no public detail on its own truncation rules to compare against.</td>
+      </tr>
+      <tr>
+        <td>File optimization (PDF/notebook/image)</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td>Both convert PDFs/notebooks to text/Markdown and resize images. Boost claims "2–3× fewer tokens" typical; tsaver measured a real 2 MB PDF at 99.9% byte reduction in the token savings report (see that report for why the token-count metric specifically doesn't apply well to this case).</td>
+      </tr>
+      <tr>
+        <td>Code graph / repo-wide symbol index</td>
+        <td class="center"><span class="pill partial">Early access</span></td>
+        <td class="center"><span class="pill partial">Regex heuristic</span></td>
+        <td>Boost's BoostGraph claims real exploration speedups but is early access with no public algorithm detail. tsaver's <code>graph build</code>/<code>query</code> is openly a regex-pattern index, not an AST — documented as approximate by design, not a hidden limitation.</td>
+      </tr>
+      <tr>
+        <td>Reversible output (retrieve originals)</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td><code>boost retrieve &lt;id&gt;</code> / <code>tsaver retrieve &lt;id&gt;</code> — same concept, nothing is ever discarded on either side.</td>
+      </tr>
+      <tr>
+        <td>Adaptive filter disabling</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill no">No</span></td>
+        <td>Boost disables a filter locally after it's retrieved repeatedly (configurable threshold, default 3). tsaver has no equivalent — a real gap worth considering as a follow-up.</td>
+      </tr>
+      <tr>
+        <td>Local savings dashboard</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td>Both show aggregate savings and a "find opportunities"/<code>filters gaps</code> view. tsaver's dashboard additionally breaks out an approx.-tokens-saved tile and per-row column.</td>
+      </tr>
+      <tr>
+        <td>OpenTelemetry export / PR usage comments</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill no">No</span></td>
+        <td>Deliberately out of scope for tsaver — kept entirely local, no network calls, by design (see the main <a href="index.html#how-tsaver-actually-works">usage reference</a>).</td>
+      </tr>
+      <tr>
+        <td>Editor/agent hook integration</td>
+        <td class="center"><span class="pill yes">Yes</span></td>
+        <td class="center"><span class="pill partial">Claude Code only</span></td>
+        <td>Boost claims hooks for Claude Code, Cursor, Codex CLI, Copilot, OpenCode. tsaver only ships a verified Claude Code hook (Bash + Read tools) — other agents' hook formats weren't built against because they couldn't be verified in this environment.</td>
+      </tr>
+      <tr>
+        <td>Install method</td>
+        <td class="center">Signed binary release</td>
+        <td class="center">Git clone + <code>npm link</code></td>
+        <td>Boost ships signed platform binaries via <code>install.sh</code>/<code>install.ps1</code>. tsaver is source-only right now — see the <a href="index.html#troubleshooting">troubleshooting section</a> for known install friction on restrictive networks.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="takeaways">What this comparison actually establishes</h2>
+  <ul>
+    <li><strong>On the one fully-specified, reproducible example Boost publishes, tsaver's output is now functionally identical</strong> — same failure, same traceback, same assertion, same summary, one extra line of deliberate tsaver-specific detail.</li>
+    <li><strong>This required a real fix, not just a claim.</strong> The gap was found by actually running the comparison, not assumed away — tsaver's pytest filter had a genuine bug against real-world pytest output format before this report was written.</li>
+    <li><strong>Boost has real, documented capabilities tsaver doesn't have</strong>: adaptive filter auto-disabling, verified multi-agent hook support beyond Claude Code, and OTel/PR integrations (the last two are deliberate scope decisions for tsaver, not oversights).</li>
+    <li><strong>Boost's own internals can't be fully verified</strong> — it's a closed-source compiled binary with no public source repository, so claims about MCP compaction rules, BoostGraph's algorithm, and exact filter thresholds for tools other than pytest rest on documentation only, not independently reproducible code.</li>
+  </ul>
+
+  <h2 id="methodology">Methodology</h2>
+  <ol>
+    <li>Boost's GitHub repository (<code>jfrog/boost</code>) was cloned directly to inspect for source code; it contains only install scripts, a GitHub Action wrapper, and release metadata — the actual filtering engine is a compiled Go binary not published in that repository.</li>
+    <li>Boost's README.md and its linked documentation pages were read in full for every claim quoted or compared against in this report.</li>
+    <li>The pytest example used in the deep-dive section is copied verbatim, character-for-character, from Boost's own published README (the "Without Boost" block), run as a real script that reproduces that exact output, then piped through <code>tsaver run -- pytest</code>.</li>
+    <li>The "after" comparison is a literal <code>diff</code> between Boost's own published "With Boost" block and tsaver's actual stdout from that run — not a visual eyeball comparison.</li>
+    <li>The pytest filter bug was found, fixed, and re-verified within this same session; the before-fix 0%-reduction result shown above was independently reproduced before any code change, and the after-fix result was reproduced again after.</li>
+  </ol>
+
+  <footer>tsaver — local-first, no telemetry, no network calls. See the <a href="index.html">full usage reference</a> and the <a href="token-savings-report.html">token savings report</a>.</footer>
+</div>
+<script>
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const btn = document.getElementById("theme-toggle-btn");
+  if (btn) btn.textContent = theme === "dark" ? "☀️ Light" : "🌙 Dark";
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  const next = current === "dark" ? "light" : "dark";
+  try { localStorage.setItem("tsaver-docs-theme", next); } catch {}
+  applyTheme(next);
+}
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem("tsaver-docs-theme"); } catch {}
+  applyTheme(saved === "dark" ? "dark" : "light");
+})();
+</script>
+</body>
+</html>
