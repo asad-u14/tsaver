@@ -33,7 +33,7 @@ rm -f "$(dirname "$(which node)")/tsaver"   # removes a leftover dangling symlin
 - `tsaver filters gaps` — find commands that need a custom filter
 - `tsaver report` — aggregate savings summary
 - `tsaver retrieve <id>` — recover original unfiltered content
-- `tsaver init --claude` — auto-filter every Bash command Claude Code runs
+- `tsaver init --claude` — auto-filter every Bash command and optimize every PDF/notebook/image Read Claude Code does
 - `tsaver graph build` / `tsaver graph query` — lightweight code symbol index
 - `tsaver dashboard` — local web UI over your history
 

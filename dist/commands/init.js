@@ -60,7 +60,73 @@ process.stdin.on("end", () => {
 });
 `;
 }
+function buildReadHookScript(tsaverBinPath) {
+    const escapedBinPath = tsaverBinPath.replace(/"/g, '\\"');
+    return `#!/usr/bin/env node
+// Installed by \`tsaver init --claude\` — for Read calls on PDFs, Jupyter
+// notebooks, or images, runs \`tsaver read --cache\` first and redirects the
+// Read to the optimized/extracted output instead of the raw original.
+const { execFileSync } = require("node:child_process");
+const TSAVER_BIN = ${JSON.stringify(escapedBinPath)};
+
+const OPTIMIZABLE_RE = /\\.(pdf|ipynb|png|jpe?g|gif|webp)$/i;
+// Guards against redirecting a Read that's already pointed at tsaver's own
+// cache or a previously-written .optimized.<ext> file — avoids pointless
+// re-processing if Claude (or the user) reads an already-optimized path.
+const ALREADY_OPTIMIZED_RE = /(\\.tsaver[\\\\/]cache[\\\\/]|\\.optimized\\.[^.\\\\/]+$)/i;
+
+let raw = "";
+process.stdin.on("data", (c) => (raw += c));
+process.stdin.on("end", () => {
+  let input;
+  try {
+    input = JSON.parse(raw);
+  } catch {
+    process.exit(0);
+  }
+
+  const filePath = input?.tool_input?.file_path;
+  if (typeof filePath !== "string" || filePath.trim() === "") {
+    process.exit(0);
+  }
+
+  if (!OPTIMIZABLE_RE.test(filePath) || ALREADY_OPTIMIZED_RE.test(filePath)) {
+    process.exit(0);
+  }
+
+  let redirectPath;
+  try {
+    redirectPath = execFileSync(
+      "node",
+      [TSAVER_BIN, "read", "--cache", filePath],
+      { encoding: "utf8", env: { ...process.env, TSAVER_HOOK_SOURCE: "1" }, timeout: 30000 },
+    ).trim();
+  } catch {
+    // If tsaver read fails for any reason (corrupt file, unsupported edge
+    // case), fall through to Claude's normal unmodified Read rather than
+    // blocking the tool call.
+    process.exit(0);
+  }
+
+  if (!redirectPath) {
+    process.exit(0);
+  }
+
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "allow",
+        updatedInput: { ...input.tool_input, file_path: redirectPath },
+      },
+    }),
+  );
+  process.exit(0);
+});
+`;
+}
 const HOOK_COMMAND = "node ~/.claude/hooks/tsaver-reroute.cjs";
+const READ_HOOK_COMMAND = "node ~/.claude/hooks/tsaver-read-reroute.cjs";
 function readSettings(path) {
     if (!existsSync(path))
         return {};
@@ -71,49 +137,55 @@ function readSettings(path) {
         throw new Error(`Could not parse existing ${path}: ${err.message}`);
     }
 }
-function alreadyInstalled(settings) {
+function hasHookEntry(settings, matcher, command) {
     const groups = settings.hooks?.PreToolUse ?? [];
-    return groups.some((g) => g.matcher === "Bash" && g.hooks.some((h) => h.command === HOOK_COMMAND));
+    return groups.some((g) => g.matcher === matcher && g.hooks.some((h) => h.command === command));
+}
+function addHookEntry(settings, matcher, command) {
+    settings.hooks ??= {};
+    settings.hooks.PreToolUse ??= [];
+    settings.hooks.PreToolUse.push({ matcher, hooks: [{ type: "command", command }] });
 }
 async function initClaude() {
     const claudeDir = join(homedir(), ".claude");
     const hooksDir = join(claudeDir, "hooks");
     const settingsPath = join(claudeDir, "settings.json");
-    const hookScriptPath = join(hooksDir, "tsaver-reroute.cjs");
+    const bashHookScriptPath = join(hooksDir, "tsaver-reroute.cjs");
+    const readHookScriptPath = join(hooksDir, "tsaver-read-reroute.cjs");
     if (!existsSync(claudeDir)) {
         process.stderr.write(`tsaver init --claude: ${claudeDir} not found. Is Claude Code installed?\n`);
         return 1;
     }
     // Resolve the real, symlink-free path to this running tsaver's entry
-    // point so the hook script never depends on PATH/nvm being set up in
-    // whatever shell context Claude Code's hook command runs in.
+    // point so the hook scripts never depend on PATH/nvm being set up in
+    // whatever shell context Claude Code's hook commands run in.
     const tsaverBinPath = realpathSync(process.argv[1]);
     const settings = readSettings(settingsPath);
-    const alreadyHasEntry = alreadyInstalled(settings);
+    const bashAlreadyInstalled = hasHookEntry(settings, "Bash", HOOK_COMMAND);
+    const readAlreadyInstalled = hasHookEntry(settings, "Read", READ_HOOK_COMMAND);
     mkdirSync(hooksDir, { recursive: true });
-    writeFileSync(hookScriptPath, buildHookScript(tsaverBinPath), { mode: 0o755 });
-    if (alreadyHasEntry) {
-        process.stdout.write(`Refreshed ${hookScriptPath} to point at ${tsaverBinPath}.\n` +
-            "The settings.json hook entry was already present — nothing to change there.\n");
-        return 0;
+    writeFileSync(bashHookScriptPath, buildHookScript(tsaverBinPath), { mode: 0o755 });
+    writeFileSync(readHookScriptPath, buildReadHookScript(tsaverBinPath), { mode: 0o755 });
+    if (!bashAlreadyInstalled)
+        addHookEntry(settings, "Bash", HOOK_COMMAND);
+    if (!readAlreadyInstalled)
+        addHookEntry(settings, "Read", READ_HOOK_COMMAND);
+    if (!bashAlreadyInstalled || !readAlreadyInstalled) {
+        writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
     }
-    settings.hooks ??= {};
-    settings.hooks.PreToolUse ??= [];
-    settings.hooks.PreToolUse.push({
-        matcher: "Bash",
-        hooks: [{ type: "command", command: HOOK_COMMAND }],
-    });
-    writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf8");
-    process.stdout.write([
-        `Installed ${hookScriptPath} (pointing at ${tsaverBinPath})`,
-        `Updated ${settingsPath} with a PreToolUse hook on Bash.`,
-        "",
-        "Claude Code must reload hooks for this to take effect:",
-        "  - open /hooks once in your Claude Code session, or",
-        "  - restart Claude Code.",
-        "",
-        "After that, every Bash command Claude runs will be filtered through `tsaver run`.",
-    ].join("\n") + "\n");
+    const out = [
+        `${bashAlreadyInstalled ? "Refreshed" : "Installed"} ${bashHookScriptPath}`,
+        `${readAlreadyInstalled ? "Refreshed" : "Installed"} ${readHookScriptPath}`,
+        `Both point at ${tsaverBinPath}.`,
+    ];
+    if (!bashAlreadyInstalled || !readAlreadyInstalled) {
+        out.push(`Updated ${settingsPath} with new PreToolUse hook entries.`);
+    }
+    else {
+        out.push(`${settingsPath} already had both hook entries — nothing to change there.`);
+    }
+    out.push("", "Claude Code must reload hooks for this to take effect:", "  - open /hooks once in your Claude Code session, or", "  - restart Claude Code.", "", "After that:", "  - every Bash command Claude runs will be filtered through `tsaver run`.", "  - every Read of a .pdf/.ipynb/image file will be redirected through `tsaver read` first.");
+    process.stdout.write(out.join("\n") + "\n");
     return 0;
 }
 export async function init(args) {

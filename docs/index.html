@@ -209,7 +209,7 @@ tsaver run --stats -- pytest
 tsaver run -- cargo build</code></pre>
 
   <h2 id="read">tsaver read</h2>
-  <pre><code>tsaver read [--stats] &lt;path&gt;</code></pre>
+  <pre><code>tsaver read [--stats] [--cache] &lt;path&gt;</code></pre>
   <p>Optimizes a file for an agent to consume, dispatching by extension:</p>
   <table>
     <thead><tr><th>Extension</th><th>Behavior</th></tr></thead>
@@ -220,6 +220,7 @@ tsaver run -- cargo build</code></pre>
       <tr><td>anything else</td><td>Passthrough — prints as-is, 0% reduction, still logged.</td></tr>
     </tbody>
   </table>
+  <p><code>--cache</code>: writes the optimized content to <code>~/.tsaver/cache/&lt;hash&gt;.md</code> (or points at the <code>.optimized.&lt;ext&gt;</code> image file) and prints only that path — used internally by the <a href="#init-claude">Claude Code Read hook</a>, not generally needed interactively.</p>
   <pre><code>tsaver read --stats report.pdf
 tsaver read notebook.ipynb
 tsaver read screenshot.png</code></pre>
@@ -256,21 +257,34 @@ Add .tsaver/filters/&lt;command&gt;.toml to improve filtering for these.</code><
 
   <h2 id="init-claude">tsaver init --claude</h2>
   <pre><code>tsaver init --claude</code></pre>
-  <p>Installs a Claude Code <code>PreToolUse</code> hook on the <code>Bash</code> tool so every Bash command Claude Code runs — terminal or VS Code extension — is automatically rerouted through <code>tsaver run</code>.</p>
+  <p>Installs <strong>two</strong> Claude Code <code>PreToolUse</code> hooks:</p>
+  <ol>
+    <li>On the <code>Bash</code> tool — every Bash command Claude Code runs (terminal or VS Code extension) is automatically rerouted through <code>tsaver run</code>.</li>
+    <li>On the <code>Read</code> tool — every Read of a <code>.pdf</code>, <code>.ipynb</code>, or image file is automatically redirected through <code>tsaver read</code> first, so Claude sees the optimized/extracted content instead of the raw original.</li>
+  </ol>
+  <p>No manual prefixing or <code>tsaver read</code> calls needed for either case.</p>
 
   <h3>What it does</h3>
   <ul>
-    <li>Writes <code>~/.claude/hooks/tsaver-reroute.cjs</code> (mode <code>0o755</code>).</li>
-    <li>Merges a <code>hooks.PreToolUse</code> entry into <code>~/.claude/settings.json</code> — never overwrites existing settings.</li>
-    <li>Re-running always refreshes the hook script's content, even if the settings.json entry already exists.</li>
+    <li>Writes <code>~/.claude/hooks/tsaver-reroute.cjs</code> (Bash hook) and <code>~/.claude/hooks/tsaver-read-reroute.cjs</code> (Read hook), both mode <code>0o755</code>.</li>
+    <li>Merges two <code>hooks.PreToolUse</code> entries into <code>~/.claude/settings.json</code> — never overwrites existing settings.</li>
+    <li>Re-running always refreshes both hook scripts' content, even if the settings.json entries already exist.</li>
   </ul>
 
-  <h3>Why the hook embeds an absolute path</h3>
-  <p>The hook invokes <code>node '&lt;resolved absolute path&gt;' run -- bash -c '...'</code> rather than a bare <code>tsaver</code> command. This fixes a real bug: Claude Code's hook commands can run in a non-interactive shell that never sources the init files a tool like <code>nvm</code> relies on for <code>PATH</code>. Relying on <code>PATH</code> caused every Bash call to silently fail, freezing the session. The absolute-path fix makes the hook immune to PATH/shell-context issues.</p>
+  <h3>Why the hooks embed an absolute path</h3>
+  <p>Both hooks invoke <code>node '&lt;resolved absolute path&gt;' ...</code> rather than a bare <code>tsaver</code> command. This fixes a real bug: Claude Code's hook commands can run in a non-interactive shell that never sources the init files a tool like <code>nvm</code> relies on for <code>PATH</code>. Relying on <code>PATH</code> caused every Bash call to silently fail, freezing the session. The absolute-path fix makes both hooks immune to PATH/shell-context issues.</p>
 
-  <h3>What the hook does NOT reroute</h3>
+  <h3>What the Bash hook does NOT reroute</h3>
   <p>Commands matching this pattern run directly, unmodified — wrapping them would silently break their effect on the rest of the session:</p>
   <pre><code>cd, pushd, popd, export, source, . (dot), alias, unset, declare, local, readonly, set, exec</code></pre>
+
+  <h3>How the Read hook works</h3>
+  <p>On every <code>Read</code> call, checks the extension against <code>.pdf .ipynb .png .jpg .jpeg .gif .webp</code> (case-insensitive). If it matches and isn't already a cache/optimized path, it runs <code>tsaver read --cache &lt;path&gt;</code> and redirects to the single-line path it prints back:</p>
+  <ul>
+    <li>PDFs/notebooks → a cached extracted-text/Markdown file under <code>~/.tsaver/cache/</code>.</li>
+    <li>Images → the actual resized <code>&lt;name&gt;.optimized.&lt;ext&gt;</code> image file, <strong>never text</strong> — Claude's Read tool needs real image bytes for vision.</li>
+  </ul>
+  <p>If <code>tsaver read</code> fails for any reason (corrupt file, timeout after 30s), the hook falls through silently and Claude reads the original file unmodified — it never blocks the Read.</p>
 
   <div class="note"><strong>Manual step required:</strong> after running <code>tsaver init --claude</code>, Claude Code must reload hooks — open <code>/hooks</code> once or restart Claude Code. This isn't automatic.</div>
 

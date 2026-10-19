@@ -4,29 +4,45 @@ import { detectKind, readAsText } from "../fileopt/index.js";
 import { pdfToText } from "../fileopt/pdf.js";
 import { notebookToMarkdown } from "../fileopt/notebook.js";
 import { optimizeImage } from "../fileopt/image.js";
+import { writeCache } from "../fileopt/cache.js";
 import { statsForText, printStats } from "../stats.js";
 import { saveEntry } from "../history.js";
 export async function read(args) {
     let rest = args;
     let stats = false;
-    if (rest[0] === "--stats") {
-        stats = true;
-        rest = rest.slice(1);
+    let cacheMode = false;
+    for (;;) {
+        if (rest[0] === "--stats") {
+            stats = true;
+            rest = rest.slice(1);
+        }
+        else if (rest[0] === "--cache") {
+            cacheMode = true;
+            rest = rest.slice(1);
+        }
+        else {
+            break;
+        }
     }
     const path = rest[0];
     if (!path) {
-        process.stderr.write("Usage: tsaver read [--stats] <path>\n");
+        process.stderr.write("Usage: tsaver read [--stats] [--cache] <path>\n");
         return 1;
     }
     const absPath = resolve(path);
     const kind = detectKind(absPath);
     let outputText;
     let historyStats;
+    // For images, the "cache" redirect target is the resized image file itself
+    // (not text) — Claude's Read tool needs actual image bytes for vision, so
+    // replacing that with a text summary would silently break image reading.
+    let cacheRedirectPath = null;
     switch (kind) {
         case "pdf": {
             const originalBytes = statSync(absPath).size;
             outputText = await pdfToText(absPath);
-            process.stdout.write(outputText + "\n");
+            if (!cacheMode)
+                process.stdout.write(outputText + "\n");
             const filtered = statsForText(outputText);
             historyStats = {
                 rawLines: filtered.lines,
@@ -41,7 +57,8 @@ export async function read(args) {
         case "notebook": {
             const originalText = readAsText(absPath);
             outputText = notebookToMarkdown(absPath);
-            process.stdout.write(outputText + "\n");
+            if (!cacheMode)
+                process.stdout.write(outputText + "\n");
             historyStats = textStats(originalText, outputText);
             break;
         }
@@ -52,7 +69,9 @@ export async function read(args) {
                 `  dimensions: ${result.originalWidth}x${result.originalHeight} -> ${result.newWidth}x${result.newHeight}`,
                 `  bytes: ${result.originalBytes} -> ${result.optimizedBytes}`,
             ].join("\n");
-            process.stdout.write(outputText + "\n");
+            if (!cacheMode)
+                process.stdout.write(outputText + "\n");
+            cacheRedirectPath = result.outputPath;
             historyStats = {
                 rawLines: 1,
                 filteredLines: 1,
@@ -66,7 +85,8 @@ export async function read(args) {
         default: {
             const originalText = readAsText(absPath);
             outputText = originalText;
-            process.stdout.write(outputText);
+            if (!cacheMode)
+                process.stdout.write(outputText);
             historyStats = textStats(originalText, outputText);
         }
     }
@@ -77,9 +97,14 @@ export async function read(args) {
         kind: "read",
         label: path,
         stats: historyStats,
+        source: process.env.TSAVER_HOOK_SOURCE ? "hook" : "manual",
         rawPath: absPath,
         filteredText: outputText,
     });
+    if (cacheMode) {
+        const redirectPath = cacheRedirectPath ?? writeCache(absPath, outputText);
+        process.stdout.write(redirectPath + "\n");
+    }
     return 0;
 }
 function textStats(rawText, filteredText) {

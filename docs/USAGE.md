@@ -108,7 +108,7 @@ tsaver run -- cargo build
 ## `tsaver read`
 
 ```
-tsaver read [--stats] <path>
+tsaver read [--stats] [--cache] <path>
 ```
 
 Optimizes a file for an agent to consume, dispatching by file extension:
@@ -119,6 +119,9 @@ Optimizes a file for an agent to consume, dispatching by file extension:
 | `.ipynb` | Converts to Markdown: markdown cells pass through as-is, code cells become fenced code blocks, and any cell output text longer than 20 lines is truncated with a `(truncated, N more lines)` marker. |
 | `.png` `.jpg` `.jpeg` `.gif` `.webp` | Resizes (if larger than 1024px on the longest side) via `jimp` and writes `<name>.optimized.<ext>` alongside the original. Prints the new dimensions and before/after byte size. |
 | anything else | Passthrough — prints the file as-is, 0% reduction, still logged to history. |
+
+### `--cache`
+Instead of printing the optimized content to stdout, writes it to `~/.tsaver/cache/<hash>.md` (or, for images, uses the already-written `.optimized.<ext>` sibling file) and prints **only that path** on stdout. This is what the [Claude Code Read hook](#tsaver-init---claude) uses internally to redirect a `Read` tool call — it's not generally needed for interactive use.
 
 ### Examples
 ```bash
@@ -206,27 +209,38 @@ tsaver retrieve a1b2c3d4e5
 tsaver init --claude
 ```
 
-Installs a Claude Code `PreToolUse` hook on the `Bash` tool so **every Bash command Claude Code runs — in the terminal or in the VS Code extension — is automatically rerouted through `tsaver run`** before its output reaches Claude's context. No manual prefixing needed.
+Installs **two** Claude Code `PreToolUse` hooks:
+1. On the `Bash` tool — every Bash command Claude Code runs (terminal or VS Code extension) is automatically rerouted through `tsaver run` before its output reaches Claude's context.
+2. On the `Read` tool — every Read of a `.pdf`, `.ipynb`, or image file is automatically redirected through `tsaver read` first, so Claude sees the optimized/extracted content instead of the raw original. No manual prefixing or `tsaver read` calls needed for either case.
 
 ### What it does
-- Writes `~/.claude/hooks/tsaver-reroute.cjs` (mode `0o755`).
-- Merges a `hooks.PreToolUse` entry into `~/.claude/settings.json` — **merges, never overwrites** existing settings.
-- Re-running `tsaver init --claude` always refreshes the hook script's content (even if the settings.json entry already exists) — useful if tsaver's own install location has moved.
+- Writes `~/.claude/hooks/tsaver-reroute.cjs` (Bash hook) and `~/.claude/hooks/tsaver-read-reroute.cjs` (Read hook), both mode `0o755`.
+- Merges two `hooks.PreToolUse` entries into `~/.claude/settings.json` — **merges, never overwrites** existing settings.
+- Re-running `tsaver init --claude` always refreshes both hook scripts' content (even if the settings.json entries already exist) — useful if tsaver's own install location has moved.
 
-### Why the hook embeds an absolute path
-The generated hook script invokes `node '<resolved absolute path to dist/cli.js>' run -- bash -c '<command>'` rather than a bare `tsaver` command. This was a real bug found and fixed in development: Claude Code's hook commands can run in a non-interactive shell context that never sources the shell init files a version manager like `nvm` relies on to put `tsaver` on `PATH`. Relying on `PATH` here caused every single Bash call to silently fail, freezing the session (since even the recovery commands needed that same broken `tsaver`). The absolute-path fix makes the hook immune to PATH/shell-context issues.
+### Why the hooks embed an absolute path
+Both generated hook scripts invoke `tsaver`'s compiled entry point via its **resolved absolute path** (`node '<path to dist/cli.js>' ...`) rather than a bare `tsaver` command. This was a real bug found and fixed in development: Claude Code's hook commands can run in a non-interactive shell context that never sources the shell init files a version manager like `nvm` relies on to put `tsaver` on `PATH`. Relying on `PATH` here caused every single Bash call to silently fail, freezing the session (since even the recovery commands needed that same broken `tsaver`). The absolute-path fix makes both hooks immune to PATH/shell-context issues.
 
-### What the hook does NOT reroute
+### What the Bash hook does NOT reroute
 Commands matching this pattern run **directly, unmodified**, because wrapping them in a subshell would silently break their effect on the rest of the session:
 ```
 cd, pushd, popd, export, source, . (dot), alias, unset, declare, local, readonly, set, exec
 ```
 
+### How the Read hook works
+On every `Read` tool call, the hook checks the file extension against `.pdf`, `.ipynb`, `.png`, `.jpg`/`.jpeg`, `.gif`, `.webp` (case-insensitive). If it matches:
+- It skips paths that are already a tsaver cache file or already end in `.optimized.<ext>` — avoids double-processing a file tsaver already optimized.
+- Otherwise it runs `tsaver read --cache <path>` synchronously and reads back the single line of output: a redirect path.
+  - For **PDFs and notebooks**, that's a cached extracted-text/Markdown file under `~/.tsaver/cache/`.
+  - For **images**, that's the actual resized `<name>.optimized.<ext>` image file (not text) — Claude's Read tool needs real image bytes for vision, so the redirect always points at another image, never a text summary.
+- Claude's Read is then redirected to that path via `hookSpecificOutput.updatedInput.file_path`.
+- If `tsaver read` fails for any reason (corrupt file, unsupported edge case, timeout after 30s), the hook falls through silently and Claude reads the original file unmodified — it never blocks the Read.
+
 ### Required manual step
 After running `tsaver init --claude`, Claude Code must reload hooks — either open `/hooks` once in the session, or restart Claude Code. This isn't automatic.
 
-### Marking hook-originated runs
-The generated hook sets `TSAVER_HOOK_SOURCE=1` on the commands it reroutes. `tsaver run` reads that env var and records `source: "hook"` on the history entry, which is what lets `report` and the dashboard distinguish "Claude ran this automatically" from "I typed this myself."
+### Marking hook-originated entries
+Both generated hooks set `TSAVER_HOOK_SOURCE=1` on the `tsaver run`/`tsaver read` invocations they trigger. tsaver reads that env var and records `source: "hook"` on the history entry, which is what lets `report` and the dashboard distinguish "Claude triggered this automatically" from "I ran this myself."
 
 ---
 
