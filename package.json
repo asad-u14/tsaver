@@ -1,0 +1,32 @@
+{
+  "name": "tsaver",
+  "version": "1.0.0",
+  "description": "Local token/output saver for AI coding agents — filters noisy CLI output, compacts MCP responses, and optimizes files",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "tsaver": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc",
+    "start": "tsx src/cli.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["cli", "token-saver", "ai-agent", "claude-code"],
+  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "chalk": "^6.0.1",
+    "jimp": "^1.6.1",
+    "pdf-parse": "^2.4.5",
+    "smol-toml": "^1.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
