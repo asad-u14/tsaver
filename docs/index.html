@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tsaver — usage reference</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --surface: #12151c;
+    --border: #232832;
+    --text: #e4e7eb;
+    --text2: #9aa3b2;
+    --accent: #6ee7b7;
+    --code-bg: #171b23;
+    --warn-bg: #2a1f14;
+    --warn-border: #5c4420;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+  nav {
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav a {
+    display: block;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 5px 8px;
+    border-radius: 6px;
+  }
+  nav a:hover { background: var(--surface); color: var(--text); }
+  main {
+    flex: 1;
+    max-width: 820px;
+    padding: 32px 40px 80px;
+  }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  .subtitle { color: var(--text2); font-size: 14px; margin: 0 0 32px; }
+  h2 {
+    font-size: 18px;
+    margin: 48px 0 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; margin-top: 0; }
+  h3 { font-size: 15px; margin: 20px 0 8px; color: var(--accent); }
+  p { line-height: 1.6; font-size: 14px; color: var(--text); }
+  code {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text2); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .note {
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin: 12px 0;
+  }
+  .note strong { color: #fbbf24; }
+  ul { font-size: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="#install">Install</a>
+  <a href="#run">tsaver run</a>
+  <a href="#read">tsaver read</a>
+  <a href="#mcp">tsaver mcp</a>
+  <a href="#filters-gaps">tsaver filters gaps</a>
+  <a href="#report">tsaver report</a>
+  <a href="#retrieve">tsaver retrieve</a>
+  <a href="#init-claude">tsaver init --claude</a>
+  <a href="#graph">tsaver graph</a>
+  <a href="#dashboard">tsaver dashboard</a>
+  <a href="#custom-filters">Custom filters</a>
+  <a href="#history-storage">History storage</a>
+  <a href="#troubleshooting">Troubleshooting</a>
+</nav>
+<main>
+  <h1>tsaver — usage reference</h1>
+  <p class="subtitle">A local, on-disk token/output saver for AI coding agents. No telemetry, no cloud, no network calls — everything lives under <code>~/.tsaver/</code> and project-local <code>.tsaver/</code>.</p>
+
+  <h2 id="install">Install</h2>
+  <pre><code>git clone git@gitlab.com:ai-projects-14/tsaver.git
+cd tsaver
+npm install
+npm run build
+npm link</code></pre>
+  <p><code>npm link</code> makes the <code>tsaver</code> command available globally.</p>
+  <div class="note"><strong>Do not use</strong> <code>npm install -g git+ssh://git@gitlab.com/...</code>. npm's git installer fetches GitLab packages via the <code>repository/archive.tar.gz</code> REST API rather than a real <code>git clone</code>, and that endpoint can 404 on some networks (observed on a corporate network with TLS interception). Clone + <code>npm link</code> avoids this entirely.</div>
+  <p>To update later:</p>
+  <pre><code>cd /path/to/your/tsaver/clone
+git pull
+npm install
+npm run build</code></pre>
+
+  <h2 id="run">tsaver run</h2>
+  <pre><code>tsaver run [--stats] -- &lt;command&gt; [args...]</code></pre>
+  <p>Spawns <code>&lt;command&gt;</code>, captures stdout/stderr, and streams each line through a filter before printing it — stripping noise while guaranteeing failures survive. Exit code is propagated unchanged.</p>
+
+  <h3>Filter selection order</h3>
+  <ol>
+    <li>A custom <code>.toml</code> filter matching the command name.</li>
+    <li>A built-in profile, if one exists: <code>pytest</code> / <code>py.test</code>, <code>npm</code>.</li>
+    <li>Otherwise, the generic filter (fallback).</li>
+  </ol>
+
+  <h3>Generic filter behavior</h3>
+  <ul>
+    <li>Always keeps the first <strong>5</strong> lines and the last <strong>20</strong> lines of output.</li>
+    <li>Collapses <strong>3 or more</strong> consecutive near-duplicate lines (digits normalized before comparing) into one line with a <code>(×N)</code> suffix.</li>
+    <li>Drops progress-bar/spinner lines (carriage returns, <code>[===&gt;   ] 42%</code>, bare <code>NN% |</code>).</li>
+    <li>Always keeps lines matching <code>/\b(error|fail(?:ed|ure)?|exception|traceback)\b/i</code>.</li>
+    <li>On non-zero exit, appends any last-20-window lines not already emitted under a <code>--- last lines before exit ---</code> marker.</li>
+  </ul>
+
+  <h3><code>pytest</code> profile</h3>
+  <p>Keeps <code>FAILED</code>, <code>ERROR</code>, <code>E </code> (assertion detail), and the summary line. Collapses passing-dot/<code>PASSED</code> lines into a single <code>N passed</code> note.</p>
+
+  <h3><code>npm</code> profile</h3>
+  <p>Keeps <code>npm error</code>/<code>npm ERR!</code>/<code>npm warn</code>/install-summary lines and anything matching <code>error|fail</code>. Drops <code>npm notice</code>/<code>npm timing</code>/spinner lines.</p>
+
+  <h3><code>--stats</code></h3>
+  <pre><code>tsaver stats
+  lines                   32 -&gt; 8  (75.0% reduction)
+  bytes                   367 -&gt; 90  (75.5% reduction)
+  words (approx. tokens)  63 -&gt; 16  (74.6% reduction)</code></pre>
+  <p>Printed to <strong>stderr</strong> so it doesn't pollute piped stdout. "Words" is a whitespace-split count used as an approximate token proxy, not an actual tokenizer count.</p>
+
+  <h3>History</h3>
+  <p>Writes a <code>kind: "run"</code> entry with full raw/filtered text, exit code, which filter handled it, and <code>source: "hook"</code> if invoked via the Claude Code hook (otherwise <code>"manual"</code>).</p>
+
+  <pre><code>tsaver run --stats -- npm install
+tsaver run --stats -- pytest
+tsaver run -- cargo build</code></pre>
+
+  <h2 id="read">tsaver read</h2>
+  <pre><code>tsaver read [--stats] &lt;path&gt;</code></pre>
+  <p>Optimizes a file for an agent to consume, dispatching by extension:</p>
+  <table>
+    <thead><tr><th>Extension</th><th>Behavior</th></tr></thead>
+    <tbody>
+      <tr><td><code>.pdf</code></td><td>Extracts plain text via <code>pdf-parse</code>.</td></tr>
+      <tr><td><code>.ipynb</code></td><td>Converts to Markdown: markdown cells as-is, code cells as fenced blocks, cell outputs over 20 lines truncated with a marker.</td></tr>
+      <tr><td><code>.png .jpg .jpeg .gif .webp</code></td><td>Resizes (if &gt;1024px on the longest side) via <code>jimp</code>, writes <code>&lt;name&gt;.optimized.&lt;ext&gt;</code> alongside the original.</td></tr>
+      <tr><td>anything else</td><td>Passthrough — prints as-is, 0% reduction, still logged.</td></tr>
+    </tbody>
+  </table>
+  <pre><code>tsaver read --stats report.pdf
+tsaver read notebook.ipynb
+tsaver read screenshot.png</code></pre>
+  <p>History entry: <code>kind: "read"</code>, <code>rawPath</code> set to the original file (so <code>retrieve</code> re-reads it instead of duplicating its bytes).</p>
+
+  <h2 id="mcp">tsaver mcp</h2>
+  <pre><code>tsaver mcp [--stats] [--max-string N] [--max-array N] [file]</code></pre>
+  <p>Compacts a JSON document — e.g. a captured MCP tool response — while <strong>guaranteeing the output stays valid JSON</strong>. Reads from <code>file</code> if given, otherwise stdin.</p>
+  <ul>
+    <li>Strings longer than <code>--max-string</code> (default <strong>500</strong>) truncated with an inline <code>"...(N more chars)"</code> suffix.</li>
+    <li>Arrays longer than <code>--max-array</code> (default <strong>20</strong>) keep the first 3 and last 3 items, splicing in a <code>"...(N more items)"</code> marker.</li>
+    <li>Objects/nested values processed recursively.</li>
+    <li>Invalid JSON input exits 1 with a parse error — nothing is written.</li>
+  </ul>
+  <pre><code>curl -s https://api.example.com/big-response.json | tsaver mcp --stats
+tsaver mcp --stats --max-string 200 --max-array 10 response.json</code></pre>
+
+  <h2 id="filters-gaps">tsaver filters gaps</h2>
+  <pre><code>tsaver filters gaps [--top N]</code></pre>
+  <p>Scans history for <code>run</code> entries that fell back to the generic filter, groups by command basename, ranks by total raw bytes. Default <code>--top</code> is <strong>10</strong>.</p>
+  <pre><code>Commands without a custom filter (generic fallback)
+  node                 runs=4  raw_bytes=388  avg_reduction=71.4%
+
+Add .tsaver/filters/&lt;command&gt;.toml to improve filtering for these.</code></pre>
+
+  <h2 id="report">tsaver report</h2>
+  <pre><code>tsaver report</code></pre>
+  <p>Aggregate summary: total entries, per-kind byte counts and reduction %, and a "Recent entries" list. Entries with <code>source: "hook"</code> are counted in the aggregate stats but <strong>omitted</strong> from "Recent entries" so that list stays focused on commands you ran yourself.</p>
+
+  <h2 id="retrieve">tsaver retrieve</h2>
+  <pre><code>tsaver retrieve &lt;id&gt;</code></pre>
+  <p>Recovers the original, unfiltered content for any past history entry by id. For <code>run</code>/<code>mcp</code> entries, prints the stored <code>rawText</code>. For <code>read</code> entries, re-reads the original file from its stored <code>rawPath</code>.</p>
+  <pre><code>tsaver retrieve a1b2c3d4e5</code></pre>
+
+  <h2 id="init-claude">tsaver init --claude</h2>
+  <pre><code>tsaver init --claude</code></pre>
+  <p>Installs a Claude Code <code>PreToolUse</code> hook on the <code>Bash</code> tool so every Bash command Claude Code runs — terminal or VS Code extension — is automatically rerouted through <code>tsaver run</code>.</p>
+
+  <h3>What it does</h3>
+  <ul>
+    <li>Writes <code>~/.claude/hooks/tsaver-reroute.cjs</code> (mode <code>0o755</code>).</li>
+    <li>Merges a <code>hooks.PreToolUse</code> entry into <code>~/.claude/settings.json</code> — never overwrites existing settings.</li>
+    <li>Re-running always refreshes the hook script's content, even if the settings.json entry already exists.</li>
+  </ul>
+
+  <h3>Why the hook embeds an absolute path</h3>
+  <p>The hook invokes <code>node '&lt;resolved absolute path&gt;' run -- bash -c '...'</code> rather than a bare <code>tsaver</code> command. This fixes a real bug: Claude Code's hook commands can run in a non-interactive shell that never sources the init files a tool like <code>nvm</code> relies on for <code>PATH</code>. Relying on <code>PATH</code> caused every Bash call to silently fail, freezing the session. The absolute-path fix makes the hook immune to PATH/shell-context issues.</p>
+
+  <h3>What the hook does NOT reroute</h3>
+  <p>Commands matching this pattern run directly, unmodified — wrapping them would silently break their effect on the rest of the session:</p>
+  <pre><code>cd, pushd, popd, export, source, . (dot), alias, unset, declare, local, readonly, set, exec</code></pre>
+
+  <div class="note"><strong>Manual step required:</strong> after running <code>tsaver init --claude</code>, Claude Code must reload hooks — open <code>/hooks</code> once or restart Claude Code. This isn't automatic.</div>
+
+  <h2 id="graph">tsaver graph</h2>
+  <pre><code>tsaver graph build [--dir &lt;path&gt;]
+tsaver graph query &lt;symbol&gt; [--dir &lt;path&gt;]</code></pre>
+  <div class="note"><strong>Heuristic, not an AST.</strong> This is a regex-based pattern index — it does not understand scope, types, or shadowing. Expect occasional false positives (a common identifier matching unrelated text) and false negatives (unusual syntax). Treat its output as a fast pointer, not ground truth.</div>
+
+  <h3>Supported languages</h3>
+  <ul>
+    <li><strong>JS/TS</strong> (<code>.ts .tsx .js .jsx .mjs .cjs</code>): <code>function NAME</code>, <code>class NAME</code>, <code>const/let NAME = (...) =&gt;</code>, <code>const/let NAME = function</code>, <code>import</code> statements, <code>require(...)</code>.</li>
+    <li><strong>Python</strong> (<code>.py</code>): <code>def NAME</code>, <code>class NAME</code>, <code>import X</code>, <code>from X import Y</code>.</li>
+    <li>Any other extension is skipped entirely — no generic fallback.</li>
+  </ul>
+
+  <h3>build</h3>
+  <p>Walks the target directory (default: cwd), skipping <code>node_modules</code>, <code>.git</code>, <code>dist</code>, <code>build</code>, <code>out</code>, <code>.tsaver</code>, <code>coverage</code>, and hidden directories. Writes to <code>&lt;dir&gt;/.tsaver/graph.json</code>. Re-run after significant changes — it does not auto-refresh.</p>
+
+  <h3>query</h3>
+  <p>Exact case-sensitive match first; falls back to case-insensitive substring match if nothing matches exactly. Output grouped into <strong>Definitions</strong>, <strong>Imported by</strong>, and <strong>References</strong> (capped at 50 shown).</p>
+
+  <pre><code>tsaver graph build
+tsaver graph query selectFilter
+tsaver graph build --dir ~/other-project</code></pre>
+
+  <h2 id="dashboard">tsaver dashboard</h2>
+  <pre><code>tsaver dashboard [--port 4173]</code></pre>
+  <p>Starts a local-only web dashboard over the same history data <code>tsaver report</code> uses.</p>
+  <ul>
+    <li>Binds to <code>127.0.0.1</code> only — nothing exposed on the network, no data leaves the machine.</li>
+    <li>Built on Node's built-in <code>http</code> module — no new dependencies, no bundler.</li>
+    <li>Routes: <code>GET /</code>, <code>GET /api/summary</code>, <code>GET /api/history?limit=N</code>.</li>
+    <li>Auto-refreshes every <strong>5 seconds</strong>.</li>
+    <li>Opens your default browser automatically (best-effort; the printed URL always works manually).</li>
+    <li>Stop with Ctrl+C. If the port is in use, suggests <code>--port &lt;other&gt;</code>.</li>
+  </ul>
+  <pre><code>tsaver dashboard
+tsaver dashboard --port 5000</code></pre>
+
+  <h2 id="custom-filters">Custom filters</h2>
+  <p>Define keep/drop rules for a specific command via TOML:</p>
+  <pre><code># .tsaver/filters/mytool.toml
+command = "mytool"
+keep = ["^ERROR", "^FAIL"]
+drop = ["^progress"]</code></pre>
+  <ul>
+    <li><strong>Project-local</strong> (<code>.tsaver/filters/*.toml</code>) override <strong>global</strong> (<code>~/.tsaver/filters/*.toml</code>) filters for the same <code>command</code>.</li>
+    <li>Each pattern is a JS regex source string, no delimiters (<code>"^ERROR"</code> not <code>/^ERROR/</code>).</li>
+    <li><strong>Per-line order:</strong> drop wins first → keep wins second (flushing any pending repeat-collapse buffer) → otherwise goes through the same repeat-collapsing logic as the generic filter.</li>
+    <li>If the command exits non-zero and no <code>keep</code> pattern ever matched, a marker line notes the exit code.</li>
+  </ul>
+
+  <h2 id="history-storage">History storage</h2>
+  <p>Every invocation writes one JSON file to <code>~/.tsaver/history/&lt;id&gt;.json</code>:</p>
+  <pre><code>{
+  id: string;
+  timestamp: string;           // ISO 8601
+  kind: "run" | "read" | "mcp";
+  label: string;                // truncated to one line + "...(+N more lines)" if long
+  exitCode?: number | null;     // run only
+  filterName?: string;          // "generic" | "pytest" | "npm" | "custom:&lt;name&gt;"
+  source?: "hook" | "manual";   // run only
+  stats: { rawLines, filteredLines, rawBytes, filteredBytes, rawWords, filteredWords: number };
+  rawText?: string;    // run/mcp — recoverable via retrieve
+  rawPath?: string;    // read — re-read by retrieve
+  filteredText: string;
+}</code></pre>
+  <p>Nothing is deleted automatically — history accumulates until you remove <code>~/.tsaver/history/</code> yourself.</p>
+
+  <h2 id="troubleshooting">Troubleshooting</h2>
+
+  <h3><code>npm install -g git+ssh://...</code> fails (404, SELF_SIGNED_CERT, extraction errors)</h3>
+  <p>npm fetches GitLab packages via <code>repository/archive.tar.gz</code> rather than a real clone, and that endpoint can 404 on networks with TLS-intercepting proxies. Use clone + <code>npm link</code> instead.</p>
+
+  <h3><code>tsaver: command not found</code>, or it suddenly stops working</h3>
+  <ul>
+    <li><strong>Dangling global symlink</strong> from a partial git-install attempt — <code>npm uninstall -g tsaver</code>, remove any leftover symlink, reinstall via clone + link.</li>
+    <li><strong>Lost executable bit</strong> on <code>dist/cli.js</code> — <code>chmod +x dist/cli.js</code>, or re-run <code>npm run build</code>.</li>
+    <li><strong>Local changes blocking <code>git pull</code></strong> — <code>git checkout -- dist/cli.js package-lock.json</code> (both are regenerated), then pull again.</li>
+  </ul>
+
+  <h3><code>git pull</code>/<code>fetch</code> times out over SSH</h3>
+  <p>Some networks block outbound port 22. Fetch over HTTPS for one-off access: <code>git pull https://gitlab.com/ai-projects-14/tsaver.git main</code></p>
+
+  <h3>The Claude Code hook doesn't seem to be filtering anything</h3>
+  <p>Claude Code only reloads hook config at session start or when you open <code>/hooks</code> — editing <code>~/.claude/settings.json</code> has no effect on an already-running session until one of those happens.</p>
+
+</main>
+</body>
+</html>
