@@ -103,7 +103,7 @@ Project-local filters override global ones for the same command. Anything not ma
 
 ## What's out of scope
 
-This is a local-only subset of the full [JFrog Boost](https://github.com/jfrog/boost) feature set. Deliberately not included:
+Deliberately not included:
 - Code graph / repo-wide symbol indexing (BoostGraph)
 - OpenTelemetry export / cloud dashboards
 - Editor integrations beyond the Claude Code hook above
