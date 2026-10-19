@@ -1,10 +1,18 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const HOOK_SCRIPT = `#!/usr/bin/env node
+function buildHookScript(tsaverBinPath: string): string {
+  // The resolved absolute path to tsaver's entry point is embedded directly
+  // (not invoked as a bare `tsaver`) so the hook works regardless of PATH —
+  // Claude Code's hook commands may run in a non-interactive shell that
+  // never sources the shell init files a tool like nvm relies on.
+  const escapedBinPath = tsaverBinPath.replace(/"/g, '\\"');
+  return `#!/usr/bin/env node
 // Installed by \`tsaver init --claude\` — reroutes Bash tool calls through
 // \`tsaver run\` so their output is filtered before it reaches Claude's context.
+const TSAVER_BIN = ${JSON.stringify(escapedBinPath)};
+
 let raw = "";
 process.stdin.on("data", (c) => (raw += c));
 process.stdin.on("end", () => {
@@ -23,7 +31,7 @@ process.stdin.on("end", () => {
   const trimmed = command.trim();
 
   // Already routed through tsaver — avoid double-wrapping / recursion.
-  if (/^tsaver\\s+run\\b/.test(trimmed)) {
+  if (trimmed.includes("tsaver") && /\\brun\\b/.test(trimmed) && trimmed.includes(TSAVER_BIN)) {
     process.exit(0);
   }
 
@@ -37,7 +45,8 @@ process.stdin.on("end", () => {
   }
 
   const escaped = trimmed.replace(/'/g, "'\\\\''");
-  const newCommand = \`tsaver run -- bash -c '\${escaped}'\`;
+  const quotedBin = TSAVER_BIN.replace(/'/g, "'\\\\''");
+  const newCommand = \`node '\${quotedBin}' run -- bash -c '\${escaped}'\`;
 
   process.stdout.write(
     JSON.stringify({
@@ -51,6 +60,7 @@ process.stdin.on("end", () => {
   process.exit(0);
 });
 `;
+}
 
 const HOOK_COMMAND = "node ~/.claude/hooks/tsaver-reroute.cjs";
 
@@ -103,15 +113,24 @@ async function initClaude(): Promise<number> {
     return 1;
   }
 
-  const settings = readSettings(settingsPath);
+  // Resolve the real, symlink-free path to this running tsaver's entry
+  // point so the hook script never depends on PATH/nvm being set up in
+  // whatever shell context Claude Code's hook command runs in.
+  const tsaverBinPath = realpathSync(process.argv[1]);
 
-  if (alreadyInstalled(settings)) {
-    process.stdout.write("tsaver hook already installed in ~/.claude/settings.json — nothing to do.\n");
-    return 0;
-  }
+  const settings = readSettings(settingsPath);
+  const alreadyHasEntry = alreadyInstalled(settings);
 
   mkdirSync(hooksDir, { recursive: true });
-  writeFileSync(hookScriptPath, HOOK_SCRIPT, { mode: 0o755 });
+  writeFileSync(hookScriptPath, buildHookScript(tsaverBinPath), { mode: 0o755 });
+
+  if (alreadyHasEntry) {
+    process.stdout.write(
+      `Refreshed ${hookScriptPath} to point at ${tsaverBinPath}.\n` +
+        "The settings.json hook entry was already present — nothing to change there.\n",
+    );
+    return 0;
+  }
 
   settings.hooks ??= {};
   settings.hooks.PreToolUse ??= [];
@@ -124,7 +143,7 @@ async function initClaude(): Promise<number> {
 
   process.stdout.write(
     [
-      `Installed ${hookScriptPath}`,
+      `Installed ${hookScriptPath} (pointing at ${tsaverBinPath})`,
       `Updated ${settingsPath} with a PreToolUse hook on Bash.`,
       "",
       "Claude Code must reload hooks for this to take effect:",
