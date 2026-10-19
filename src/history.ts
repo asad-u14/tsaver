@@ -21,6 +21,8 @@ export interface HistoryEntry {
   label: string;
   exitCode?: number | null;
   filterName?: string;
+  /** "hook" for commands rerouted by the Claude Code PreToolUse hook (tsaver init --claude); omitted/"manual" otherwise. */
+  source?: "hook" | "manual";
   stats: HistoryStats;
   rawText?: string;
   rawPath?: string;

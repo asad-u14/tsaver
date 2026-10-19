@@ -2,6 +2,13 @@ import { selectFilter } from "../filters/index.js";
 import { run as runCommand } from "../runner.js";
 import { printStats } from "../stats.js";
 import { saveEntry } from "../history.js";
+const LABEL_MAX_LENGTH = 80;
+function toLabel(fullCommand) {
+    const lines = fullCommand.split("\n");
+    const firstLine = lines[0];
+    const truncated = firstLine.length > LABEL_MAX_LENGTH ? `${firstLine.slice(0, LABEL_MAX_LENGTH)}...` : firstLine;
+    return lines.length > 1 ? `${truncated} ...(+${lines.length - 1} more lines)` : truncated;
+}
 export async function run(args) {
     let rest = args;
     let stats = false;
@@ -25,9 +32,10 @@ export async function run(args) {
     }
     saveEntry({
         kind: "run",
-        label: [command, ...commandArgs].join(" "),
+        label: toLabel([command, ...commandArgs].join(" ")),
         exitCode: result.exitCode,
         filterName,
+        source: process.env.TSAVER_HOOK_SOURCE ? "hook" : "manual",
         stats: {
             rawLines: result.raw.lines,
             filteredLines: result.filtered.lines,

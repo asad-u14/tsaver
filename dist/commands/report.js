@@ -25,9 +25,19 @@ export async function report(_args) {
         out.push(`  ${kind.padEnd(8)} count=${g.count}  ${g.rawBytes} -> ${g.filteredBytes} bytes  (${pct.toFixed(1)}% reduction)`);
     }
     out.push("", `  total: ${rawBytes} -> ${filteredBytes} bytes  (${totalReduction.toFixed(1)}% reduction)`);
+    const hookCount = entries.filter((e) => e.source === "hook").length;
+    const manualEntries = entries.filter((e) => e.source !== "hook");
     out.push("", "Recent entries:");
-    for (const entry of entries.slice(-10)) {
-        out.push(`  ${entry.id}  ${entry.timestamp}  ${entry.kind.padEnd(5)}  ${entry.label}`);
+    if (manualEntries.length === 0) {
+        out.push("  (none — all entries so far came from the Claude Code hook)");
+    }
+    else {
+        for (const entry of manualEntries.slice(-10)) {
+            out.push(`  ${entry.id}  ${entry.timestamp}  ${entry.kind.padEnd(5)}  ${entry.label}`);
+        }
+    }
+    if (hookCount > 0) {
+        out.push("", `  (${hookCount} additional entries from the Claude Code hook omitted — still counted above)`);
     }
     process.stdout.write(out.join("\n") + "\n");
     return 0;

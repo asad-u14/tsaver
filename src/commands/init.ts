@@ -46,7 +46,7 @@ process.stdin.on("end", () => {
 
   const escaped = trimmed.replace(/'/g, "'\\\\''");
   const quotedBin = TSAVER_BIN.replace(/'/g, "'\\\\''");
-  const newCommand = \`node '\${quotedBin}' run -- bash -c '\${escaped}'\`;
+  const newCommand = \`TSAVER_HOOK_SOURCE=1 node '\${quotedBin}' run -- bash -c '\${escaped}'\`;
 
   process.stdout.write(
     JSON.stringify({
