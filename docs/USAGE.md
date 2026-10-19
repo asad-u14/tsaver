@@ -180,8 +180,9 @@ Add .tsaver/filters/<command>.toml to improve filtering for these.
 tsaver report
 ```
 
-Prints an aggregate summary across all history: total entries, per-kind (`run`/`read`/`mcp`) byte counts and reduction %, and a "Recent entries" list.
+Prints an aggregate summary across all history: total entries, per-kind (`run`/`read`/`mcp`) byte counts and reduction %, an **approx. tokens saved** line, and a "Recent entries" list.
 
+- "Tokens saved" is a whitespace-split word-count proxy (`rawWords - filteredWords`), the same approximation `--stats` uses — not an exact tokenizer count.
 - Entries with `source: "hook"` (i.e. routed through the Claude Code hook) are **counted in the aggregate stats** but **omitted from the "Recent entries" list**, so that list stays focused on commands you ran yourself. A line at the bottom notes how many hook entries were omitted.
 
 ---
@@ -291,6 +292,8 @@ Starts a local-only web dashboard over the same history data `tsaver report` use
 - **Binds to `127.0.0.1` only** — nothing is exposed on the network, no data leaves the machine.
 - Built on Node's built-in `http` module — no new dependencies, no bundler.
 - Routes: `GET /` (the dashboard page), `GET /api/summary` (same aggregate shape as `report`), `GET /api/history?limit=N` (most recent N entries, JSON).
+- Top-of-page stat tiles: total entries, **approx. tokens saved** (highlighted), raw bytes, filtered bytes, overall reduction %. "Tokens saved" is the same whitespace-split word-count proxy used by `--stats` (`rawWords - filteredWords`) — an approximation, not an exact tokenizer count.
+- The history table includes a **Tokens saved** column per row, computed the same way per-entry.
 - The page auto-refreshes every **5 seconds** via `fetch`.
 - Attempts to open your default browser automatically (`open` on macOS, `start` on Windows, `xdg-open` on Linux) — if that fails silently (no opener available), the printed URL still works manually.
 - Stop with Ctrl+C.

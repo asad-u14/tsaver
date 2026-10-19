@@ -16,6 +16,7 @@ export async function report(_args: string[]): Promise<number> {
     out.push(`  ${kind.padEnd(8)} count=${g.count}  ${g.rawBytes} -> ${g.filteredBytes} bytes  (${g.reductionPct.toFixed(1)}% reduction)`);
   }
   out.push("", `  total: ${summary.rawBytes} -> ${summary.filteredBytes} bytes  (${summary.reductionPct.toFixed(1)}% reduction)`);
+  out.push(`  approx. tokens saved: ${summary.wordsSaved.toLocaleString()} (${summary.rawWords.toLocaleString()} -> ${summary.filteredWords.toLocaleString()})`);
 
   const hookCount = entries.filter((e) => e.source === "hook").length;
   const manualEntries = entries.filter((e) => e.source !== "hook");

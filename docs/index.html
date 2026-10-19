@@ -248,7 +248,7 @@ Add .tsaver/filters/&lt;command&gt;.toml to improve filtering for these.</code><
 
   <h2 id="report">tsaver report</h2>
   <pre><code>tsaver report</code></pre>
-  <p>Aggregate summary: total entries, per-kind byte counts and reduction %, and a "Recent entries" list. Entries with <code>source: "hook"</code> are counted in the aggregate stats but <strong>omitted</strong> from "Recent entries" so that list stays focused on commands you ran yourself.</p>
+  <p>Aggregate summary: total entries, per-kind byte counts and reduction %, an <strong>approx. tokens saved</strong> line, and a "Recent entries" list. "Tokens saved" is a whitespace-split word-count proxy (<code>rawWords - filteredWords</code>) — an approximation, not an exact tokenizer count. Entries with <code>source: "hook"</code> are counted in the aggregate stats but <strong>omitted</strong> from "Recent entries" so that list stays focused on commands you ran yourself.</p>
 
   <h2 id="retrieve">tsaver retrieve</h2>
   <pre><code>tsaver retrieve &lt;id&gt;</code></pre>
@@ -317,6 +317,8 @@ tsaver graph build --dir ~/other-project</code></pre>
     <li>Binds to <code>127.0.0.1</code> only — nothing exposed on the network, no data leaves the machine.</li>
     <li>Built on Node's built-in <code>http</code> module — no new dependencies, no bundler.</li>
     <li>Routes: <code>GET /</code>, <code>GET /api/summary</code>, <code>GET /api/history?limit=N</code>.</li>
+    <li>Top-of-page stat tiles: total entries, <strong>approx. tokens saved</strong> (highlighted), raw bytes, filtered bytes, overall reduction %.</li>
+    <li>The history table includes a <strong>Tokens saved</strong> column per row. "Tokens saved" is the same whitespace-split word-count proxy used by <code>--stats</code> — an approximation, not an exact tokenizer count.</li>
     <li>Auto-refreshes every <strong>5 seconds</strong>.</li>
     <li>Opens your default browser automatically (best-effort; the printed URL always works manually).</li>
     <li>Stop with Ctrl+C. If the port is in use, suggests <code>--port &lt;other&gt;</code>.</li>
