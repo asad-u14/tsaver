@@ -134,6 +134,7 @@
   <a href="#filters-gaps">tsaver filters gaps</a>
   <a href="#report">tsaver report</a>
   <a href="#retrieve">tsaver retrieve</a>
+  <a href="#history-clear">tsaver history clear</a>
   <a href="#init-claude">tsaver init --claude</a>
   <a href="#graph">tsaver graph</a>
   <a href="#dashboard">tsaver dashboard</a>
@@ -254,6 +255,18 @@ Add .tsaver/filters/&lt;command&gt;.toml to improve filtering for these.</code><
   <pre><code>tsaver retrieve &lt;id&gt;</code></pre>
   <p>Recovers the original, unfiltered content for any past history entry by id. For <code>run</code>/<code>mcp</code> entries, prints the stored <code>rawText</code>. For <code>read</code> entries, re-reads the original file from its stored <code>rawPath</code>.</p>
   <pre><code>tsaver retrieve a1b2c3d4e5</code></pre>
+
+  <h2 id="history-clear">tsaver history clear</h2>
+  <pre><code>tsaver history clear [--force]</code></pre>
+  <p>Permanently deletes every history entry under <code>~/.tsaver/history/</code>. Nothing else is touched — the cache under <code>~/.tsaver/cache/</code> and any installed hooks/custom filters are left alone.</p>
+  <ul>
+    <li>Without <code>--force</code>, refuses and prints how many entries would be deleted.</li>
+    <li>With <code>--force</code>, deletes everything and prints a count of entries removed.</li>
+    <li>If history is already empty, prints a short confirmation and exits 0 either way.</li>
+    <li>After clearing, <code>tsaver report</code> and <code>tsaver dashboard</code> both reset to their "no history yet" state.</li>
+  </ul>
+  <pre><code>tsaver history clear
+tsaver history clear --force</code></pre>
 
   <h2 id="init-claude">tsaver init --claude</h2>
   <pre><code>tsaver init --claude</code></pre>

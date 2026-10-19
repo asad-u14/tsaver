@@ -11,12 +11,13 @@ tsaver is a local, on-disk token/output saver for AI coding agents. It wraps noi
 6. [`tsaver filters gaps`](#tsaver-filters-gaps)
 7. [`tsaver report`](#tsaver-report)
 8. [`tsaver retrieve`](#tsaver-retrieve)
-9. [`tsaver init --claude`](#tsaver-init---claude)
-10. [`tsaver graph`](#tsaver-graph)
-11. [`tsaver dashboard`](#tsaver-dashboard)
-12. [Custom filters](#custom-filters)
-13. [History storage](#history-storage)
-14. [Troubleshooting](#troubleshooting)
+9. [`tsaver history clear`](#tsaver-history-clear)
+10. [`tsaver init --claude`](#tsaver-init---claude)
+11. [`tsaver graph`](#tsaver-graph)
+12. [`tsaver dashboard`](#tsaver-dashboard)
+13. [Custom filters](#custom-filters)
+14. [History storage](#history-storage)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -200,6 +201,26 @@ Recovers the **original, unfiltered** content for any past history entry by its 
 
 ```bash
 tsaver retrieve a1b2c3d4e5
+```
+
+---
+
+## `tsaver history clear`
+
+```
+tsaver history clear [--force]
+```
+
+Permanently deletes every history entry under `~/.tsaver/history/`. Nothing else is touched — the cache under `~/.tsaver/cache/` (used by the Claude Code Read hook) and any installed hooks/custom filters are left alone.
+
+- Without `--force`, refuses and prints how many entries would be deleted, so you don't lose history by accident.
+- With `--force`, deletes everything and prints a count of entries removed.
+- If history is already empty, prints a short confirmation and exits 0 either way.
+- After clearing, `tsaver report` and `tsaver dashboard` both reset to their "no history yet" state.
+
+```bash
+tsaver history clear          # shows what would be deleted, refuses
+tsaver history clear --force  # actually deletes it
 ```
 
 ---

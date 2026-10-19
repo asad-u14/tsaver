@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
@@ -69,6 +69,24 @@ export function listEntries(): HistoryEntry[] {
     }
   }
   return entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+}
+
+/** Deletes all history entries. Returns the number of entries removed. */
+export function clearHistory(): number {
+  let files: string[];
+  try {
+    files = readdirSync(HISTORY_DIR).filter((f) => f.endsWith(".json"));
+  } catch {
+    return 0;
+  }
+  for (const file of files) {
+    try {
+      unlinkSync(join(HISTORY_DIR, file));
+    } catch {
+      // Best-effort — skip files that can't be removed (e.g. permissions).
+    }
+  }
+  return files.length;
 }
 
 export interface KindSummary {

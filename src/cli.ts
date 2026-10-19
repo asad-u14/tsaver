@@ -8,6 +8,7 @@ import { retrieve } from "./commands/retrieve.js";
 import { init } from "./commands/init.js";
 import { graph } from "./commands/graph.js";
 import { dashboard } from "./commands/dashboard.js";
+import { history } from "./commands/history.js";
 
 function printUsage(): void {
   process.stderr.write(
@@ -22,6 +23,7 @@ function printUsage(): void {
       "  tsaver init --claude",
       "  tsaver graph build|query [--dir <path>] ...",
       "  tsaver dashboard [--port 4173]",
+      "  tsaver history clear [--force]",
       "",
     ].join("\n"),
   );
@@ -66,6 +68,9 @@ async function main(): Promise<void> {
       break;
     case "dashboard":
       exitCode = await dashboard(rest);
+      break;
+    case "history":
+      exitCode = await history(rest);
       break;
     default:
       printUsage();
