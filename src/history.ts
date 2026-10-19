@@ -70,3 +70,50 @@ export function listEntries(): HistoryEntry[] {
   }
   return entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
+
+export interface KindSummary {
+  count: number;
+  rawBytes: number;
+  filteredBytes: number;
+  reductionPct: number;
+}
+
+export interface HistorySummary {
+  totalEntries: number;
+  rawBytes: number;
+  filteredBytes: number;
+  reductionPct: number;
+  byKind: Record<string, KindSummary>;
+}
+
+function reductionPct(rawBytes: number, filteredBytes: number): number {
+  return rawBytes === 0 ? 0 : (1 - filteredBytes / rawBytes) * 100;
+}
+
+export function summarizeHistory(entries: HistoryEntry[]): HistorySummary {
+  let rawBytes = 0;
+  let filteredBytes = 0;
+  const byKind: Record<string, KindSummary> = {};
+
+  for (const entry of entries) {
+    rawBytes += entry.stats.rawBytes;
+    filteredBytes += entry.stats.filteredBytes;
+    const g = byKind[entry.kind] ?? { count: 0, rawBytes: 0, filteredBytes: 0, reductionPct: 0 };
+    g.count++;
+    g.rawBytes += entry.stats.rawBytes;
+    g.filteredBytes += entry.stats.filteredBytes;
+    byKind[entry.kind] = g;
+  }
+
+  for (const kind of Object.keys(byKind)) {
+    byKind[kind].reductionPct = reductionPct(byKind[kind].rawBytes, byKind[kind].filteredBytes);
+  }
+
+  return {
+    totalEntries: entries.length,
+    rawBytes,
+    filteredBytes,
+    reductionPct: reductionPct(rawBytes, filteredBytes),
+    byKind,
+  };
+}

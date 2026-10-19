@@ -101,12 +101,30 @@ drop = ["^progress"]
 
 Project-local filters override global ones for the same command. Anything not matched by `keep` or `drop` is passed through the generic repeat-collapsing filter.
 
+### `tsaver graph build` / `tsaver graph query`
+Builds a lightweight, regex-based symbol index for a directory (JS/TS/Python), so an agent can look up a symbol's definition, references, and importers instead of grepping the whole repo.
+
+```bash
+tsaver graph build [--dir <path>]
+tsaver graph query <symbol> [--dir <path>]
+```
+
+This is a **heuristic text-pattern index, not an AST** — it does not parse scopes, types, or shadowing. Expect occasional false positives (a common name matching unrelated code) and false negatives (unusual syntax it doesn't recognize). It's meant to be faster and more targeted than grep, not a substitute for a real language server. The index is written to `.tsaver/graph.json` in the target directory; re-run `build` after significant changes to refresh it.
+
+### `tsaver dashboard`
+Starts a local web dashboard showing history and savings stats — the same data `tsaver report` prints, in a browser.
+
+```bash
+tsaver dashboard [--port 4173]
+```
+
+Binds to `127.0.0.1` only — nothing is exposed on the network, and no data leaves your machine. Opens your default browser automatically; stop it with Ctrl+C.
+
 ## What's out of scope
 
 Deliberately not included:
-- Code graph / repo-wide symbol indexing (BoostGraph)
-- OpenTelemetry export / cloud dashboards
-- Editor integrations beyond the Claude Code hook above
+- OpenTelemetry export / cloud dashboards — the dashboard above is local-only, no telemetry is sent anywhere
+- Editor integrations beyond the Claude Code hook above (e.g. Cursor, Codex CLI, Copilot CLI) — their hook/config formats weren't verified, so nothing was built against guessed formats
 
 ## License
 

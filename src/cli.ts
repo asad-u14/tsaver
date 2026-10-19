@@ -6,6 +6,8 @@ import { filtersGaps } from "./commands/filtersGaps.js";
 import { report } from "./commands/report.js";
 import { retrieve } from "./commands/retrieve.js";
 import { init } from "./commands/init.js";
+import { graph } from "./commands/graph.js";
+import { dashboard } from "./commands/dashboard.js";
 
 function printUsage(): void {
   process.stderr.write(
@@ -18,6 +20,8 @@ function printUsage(): void {
       "  tsaver report",
       "  tsaver retrieve <id>",
       "  tsaver init --claude",
+      "  tsaver graph build|query [--dir <path>] ...",
+      "  tsaver dashboard [--port 4173]",
       "",
     ].join("\n"),
   );
@@ -56,6 +60,12 @@ async function main(): Promise<void> {
       break;
     case "init":
       exitCode = await init(rest);
+      break;
+    case "graph":
+      exitCode = await graph(rest);
+      break;
+    case "dashboard":
+      exitCode = await dashboard(rest);
       break;
     default:
       printUsage();
