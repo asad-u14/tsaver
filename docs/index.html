@@ -6,6 +6,18 @@
 <title>tsaver — usage reference</title>
 <style>
   :root {
+    --bg: #ffffff;
+    --surface: #f5f6f8;
+    --border: #e1e4e9;
+    --text: #1a1d23;
+    --text2: #6b7280;
+    --accent: #0d9488;
+    --code-bg: #f1f2f5;
+    --warn-bg: #fff7e6;
+    --warn-border: #f0c36d;
+    --warn-strong: #92650a;
+  }
+  :root[data-theme="dark"] {
     --bg: #0b0d12;
     --surface: #12151c;
     --border: #232832;
@@ -15,6 +27,7 @@
     --code-bg: #171b23;
     --warn-bg: #2a1f14;
     --warn-border: #5c4420;
+    --warn-strong: #fbbf24;
   }
   * { box-sizing: border-box; }
   body {
@@ -34,6 +47,8 @@
     top: 0;
     height: 100vh;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
   }
   nav a {
     display: block;
@@ -44,6 +59,23 @@
     border-radius: 6px;
   }
   nav a:hover { background: var(--surface); color: var(--text); }
+  #theme-toggle {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  #theme-toggle button {
+    width: 100%;
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  #theme-toggle button:hover { border-color: var(--accent); }
   main {
     flex: 1;
     max-width: 820px;
@@ -88,7 +120,7 @@
     font-size: 13px;
     margin: 12px 0;
   }
-  .note strong { color: #fbbf24; }
+  .note strong { color: var(--warn-strong); }
   ul { font-size: 14px; line-height: 1.6; }
 </style>
 </head>
@@ -107,6 +139,9 @@
   <a href="#custom-filters">Custom filters</a>
   <a href="#history-storage">History storage</a>
   <a href="#troubleshooting">Troubleshooting</a>
+  <div id="theme-toggle">
+    <button id="theme-toggle-btn" type="button" onclick="toggleTheme()">🌙 Dark theme</button>
+  </div>
 </nav>
 <main>
   <h1>tsaver — usage reference</h1>
@@ -317,5 +352,33 @@ drop = ["^progress"]</code></pre>
   <p>Claude Code only reloads hook config at session start or when you open <code>/hooks</code> — editing <code>~/.claude/settings.json</code> has no effect on an already-running session until one of those happens.</p>
 
 </main>
+<script>
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️ Light theme' : '🌙 Dark theme';
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  try {
+    localStorage.setItem('tsaver-docs-theme', next);
+  } catch {
+    // localStorage unavailable (e.g. file:// with strict privacy settings) — theme just won't persist.
+  }
+  applyTheme(next);
+}
+
+(function initTheme() {
+  let saved = null;
+  try {
+    saved = localStorage.getItem('tsaver-docs-theme');
+  } catch {
+    // ignore
+  }
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+})();
+</script>
 </body>
 </html>

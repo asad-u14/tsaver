@@ -1,6 +1,6 @@
 {
   "name": "tsaver",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Local token/output saver for AI coding agents — filters noisy CLI output, compacts MCP responses, and optimizes files",
   "type": "module",
   "main": "dist/cli.js",
