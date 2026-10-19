@@ -14,10 +14,15 @@ npm run build
 npm link
 ```
 
-`npm link` makes the `tsaver` command available globally. To install directly from GitLab instead of cloning:
+`npm link` makes the `tsaver` command available globally.
+
+> **Note:** `npm install -g git+ssh://git@gitlab.com/...` does *not* work reliably for this repo — npm's git installer fetches GitLab packages via the `repository/archive.tar.gz` REST API rather than a real `git clone`, and that endpoint can 404 depending on your network/GitLab setup (observed on a corporate network with TLS interception). Clone + `npm link` above avoids that path entirely and is the supported install method.
+
+If you already ran the broken one-liner and ended up with a dangling `tsaver` command, clean it up first:
 
 ```bash
-npm install -g git+ssh://git@gitlab.com/ai-projects-14/tsaver.git
+npm uninstall -g tsaver
+rm -f "$(dirname "$(which node)")/tsaver"   # removes a leftover dangling symlink, if any
 ```
 
 ## Commands
