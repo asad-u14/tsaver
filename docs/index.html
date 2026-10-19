@@ -139,7 +139,7 @@
   <a href="#graph">tsaver graph</a>
   <a href="#dashboard">tsaver dashboard</a>
   <a href="#custom-filters">Custom filters</a>
-  <a href="#history-storage">History storage</a>
+  <a href="#how-tsaver-actually-works">How tsaver works</a>
   <a href="#troubleshooting">Troubleshooting</a>
   <div id="theme-toggle">
     <button id="theme-toggle-btn" type="button" onclick="toggleTheme()">🌙 Dark theme</button>
@@ -352,22 +352,52 @@ drop = ["^progress"]</code></pre>
     <li>If the command exits non-zero and no <code>keep</code> pattern ever matched, a marker line notes the exit code.</li>
   </ul>
 
-  <h2 id="history-storage">History storage</h2>
-  <p>Every invocation writes one JSON file to <code>~/.tsaver/history/&lt;id&gt;.json</code>:</p>
+  <h2 id="how-tsaver-actually-works">How tsaver actually works</h2>
+  <p>This section ties together everything above into one end-to-end picture: what's stored where, how each command parses its input, and what the numbers you see actually mean.</p>
+
+  <h3>Everything tsaver stores, and where</h3>
+  <p>All of it lives under your home directory — nothing is sent anywhere, nothing requires a server:</p>
+  <table>
+    <thead><tr><th>Path</th><th>Written by</th><th>Contents</th></tr></thead>
+    <tbody>
+      <tr><td><code>~/.tsaver/history/&lt;id&gt;.json</code></td><td><code>run</code>, <code>read</code>, <code>mcp</code> (one file per invocation)</td><td>Full record of what happened — see the entry shape below.</td></tr>
+      <tr><td><code>~/.tsaver/cache/&lt;sha1-of-path&gt;.md</code></td><td><code>tsaver read --cache</code> (the Claude Code Read hook)</td><td>Extracted text/Markdown for a PDF or notebook, keyed by a SHA-1 hash of the original file's absolute path. Overwritten fresh on every Read — no staleness tracking, since the hook regenerates it live each call.</td></tr>
+      <tr><td><code>&lt;original-file&gt;.optimized.&lt;ext&gt;</code> (next to the original, not under <code>~/.tsaver/</code>)</td><td><code>tsaver read</code> on an image</td><td>The resized image itself. Images never go through the text cache — the Read hook needs real image bytes for Claude's vision, so the redirect always points at this file.</td></tr>
+      <tr><td><code>.tsaver/filters/*.toml</code> (project) and <code>~/.tsaver/filters/*.toml</code> (global)</td><td>You, by hand</td><td>Custom per-command filter rules. Project-local overrides global for the same command.</td></tr>
+      <tr><td><code>.tsaver/graph.json</code></td><td><code>tsaver graph build</code></td><td>The regex-based symbol index for that directory.</td></tr>
+      <tr><td><code>~/.claude/hooks/tsaver-reroute.cjs</code> and <code>tsaver-read-reroute.cjs</code></td><td><code>tsaver init --claude</code></td><td>The two generated hook scripts.</td></tr>
+    </tbody>
+  </table>
+  <p>Nothing here is ever deleted automatically. History accumulates indefinitely until you run <a href="#history-clear"><code>tsaver history clear</code></a>; the cache directory and <code>.optimized.&lt;ext&gt;</code> files are likewise left in place until removed by hand.</p>
+
+  <h3>History entry shape</h3>
+  <p>Every <code>run</code>, <code>read</code>, and <code>mcp</code> invocation writes one JSON file to <code>~/.tsaver/history/&lt;id&gt;.json</code> (a 10-character hex id):</p>
   <pre><code>{
   id: string;
-  timestamp: string;           // ISO 8601
+  timestamp: string;            // ISO 8601
   kind: "run" | "read" | "mcp";
-  label: string;                // truncated to one line + "...(+N more lines)" if long
-  exitCode?: number | null;     // run only
-  filterName?: string;          // "generic" | "pytest" | "npm" | "custom:&lt;name&gt;"
-  source?: "hook" | "manual";   // run only
+  label: string;                 // truncated to one line + "...(+N more lines)" if long
+  exitCode?: number | null;      // run only — the wrapped command's exit code
+  filterName?: string;           // run only — "generic" | "pytest" | "npm" | "custom:&lt;name&gt;"
+  source?: "hook" | "manual";    // run and read — hook-triggered vs. you ran it yourself
   stats: { rawLines, filteredLines, rawBytes, filteredBytes, rawWords, filteredWords: number };
-  rawText?: string;    // run/mcp — recoverable via retrieve
-  rawPath?: string;    // read — re-read by retrieve
+  rawText?: string;    // run/mcp — full original content, recoverable via retrieve
+  rawPath?: string;    // read — original file's path, re-read by retrieve rather than duplicated here
   filteredText: string;
 }</code></pre>
-  <p>Nothing is deleted automatically — history accumulates until you remove <code>~/.tsaver/history/</code> yourself.</p>
+
+  <h3>How each command actually parses/processes its input</h3>
+  <ul>
+    <li><strong>run</strong>: spawns the command with <code>child_process.spawn</code>, reads stdout/stderr <strong>line by line</strong> via Node's <code>readline</code> (so large output never sits fully in memory before filtering). Each line goes to the active filter's <code>processLine</code>, which keeps, drops, or buffers it for possible repeat-collapsing.</li>
+    <li><strong>read</strong>: dispatches purely by file <strong>extension</strong>, not content sniffing — <code>.pdf</code> uses <code>pdf-parse</code> to extract embedded text objects from the PDF structure; <code>.ipynb</code> is parsed as JSON (it's just a JSON document) and walked cell-by-cell; images are decoded and resized by <code>jimp</code>; anything else is read as plain UTF-8 text unchanged.</li>
+    <li><strong>mcp</strong>: parses the input with <code>JSON.parse</code> up front — a failure here reports the error and exits without writing anything. The compaction walk recurses through the parsed value truncating long strings/arrays, then re-serializes with <code>JSON.stringify</code>, which is what guarantees valid JSON output.</li>
+    <li><strong>graph build</strong>: walks the directory tree (skipping <code>node_modules</code>, <code>.git</code>, <code>dist</code>, <code>build</code>, <code>out</code>, <code>.tsaver</code>, <code>coverage</code>, hidden dirs), reads each matching file as UTF-8 text, and runs it line-by-line through a fixed set of regexes per language — it never builds an actual syntax tree.</li>
+  </ul>
+
+  <h3>What the byte and "tokens saved" numbers actually mean — and a real caveat</h3>
+  <p>Every entry tracks two independent before/after measurements: bytes, and "words" (a whitespace-split word count used as an approximate token proxy, not an exact tokenizer count — labeled as such everywhere it's shown).</p>
+  <p>For <code>run</code> and <code>mcp</code>, raw and filtered are both genuinely comparable plain text, so both numbers are real and meaningful. A representative real test, run live through <code>tsaver run</code> on a script producing 50 repetitive pass lines plus one real error: <strong>52 → 8 lines, 1,425 → 247 bytes (82.7% reduction), 163 → 32 words (80.4% reduction, ~131 tokens saved)</strong> — the repeated lines collapsed to one <code>(×45)</code> line while the error and summary stayed intact.</p>
+  <div class="note"><strong>For PDF and notebook reads, the word-count metric is not meaningful</strong> and will usually show 0 "tokens saved" even though real savings are large. There's no plain-text "raw" version of a binary PDF to count words in before extraction happens, so <code>tsaver read</code> sets the raw word count equal to the already-extracted text's word count — they're always identical for these file kinds. The <strong>byte</strong> reduction is still real (a 2 MB PDF reduced to a few KB of text is a genuine ~2 MB reduction), so for PDF/notebook entries, check the byte numbers rather than reading "0 tokens saved" as "this did nothing."</div>
 
   <h2 id="troubleshooting">Troubleshooting</h2>
 
