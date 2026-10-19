@@ -126,6 +126,7 @@
 </head>
 <body>
 <nav>
+  <a href="#why">Why tsaver</a>
   <a href="#install">Install</a>
   <a href="#run">tsaver run</a>
   <a href="#read">tsaver read</a>
@@ -146,6 +147,12 @@
 <main>
   <h1>tsaver — usage reference</h1>
   <p class="subtitle">A local, on-disk token/output saver for AI coding agents. No telemetry, no cloud, no network calls — everything lives under <code>~/.tsaver/</code> and project-local <code>.tsaver/</code>.</p>
+
+  <h2 id="why">Why tsaver exists</h2>
+  <p>AI coding agents like Claude Code spend a large share of their context window — and your token budget — reading raw command output that has nothing to do with the task at hand. A single <code>npm install</code> or <code>pytest</code> run can dump hundreds of lines of progress bars, repeated log lines, and install chatter into the conversation, and every one of those lines is tokens the model has to read before it can get to the one line that actually matters: the error, the failure, the summary.</p>
+  <p>The same problem shows up in other forms: an MCP tool can return a JSON blob with megabytes of nested data when only a handful of fields are relevant; a PDF or Jupyter notebook an agent needs to read might be mostly formatting and binary overhead; a repo-wide grep for "where is this function used" burns several tool calls that a small local index could answer in one.</p>
+  <p>tsaver sits between the agent and all of that noise. It wraps the commands an agent runs, compacts the data it reads, and keeps everything that got filtered out recoverable on disk — so you get the token savings without ever losing information for good. It runs entirely locally: no data leaves your machine, there's no telemetry, and nothing needs a network connection to work.</p>
+  <p><strong>Who this is for:</strong> anyone running Claude Code (or another agent) against a real codebase, where routine commands — installs, test suites, builds, API calls — are quietly eating context on noise instead of signal. If you've ever watched an agent's context fill up with `PASSED` lines or spinner frames, that's the problem tsaver is built to fix.</p>
 
   <h2 id="install">Install</h2>
   <pre><code>git clone git@gitlab.com:ai-projects-14/tsaver.git

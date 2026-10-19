@@ -3,19 +3,32 @@
 tsaver is a local, on-disk token/output saver for AI coding agents. It wraps noisy CLI commands, compacts large JSON (e.g. MCP tool responses), optimizes files for agent consumption (PDFs, notebooks, images), builds a lightweight code index, and keeps a local dashboard — all without any telemetry, cloud dependency, or network calls. Everything lives under `~/.tsaver/` and `.tsaver/` (project-local).
 
 ## Contents
-1. [Install](#install)
-2. [`tsaver run`](#tsaver-run)
-3. [`tsaver read`](#tsaver-read)
-4. [`tsaver mcp`](#tsaver-mcp)
-5. [`tsaver filters gaps`](#tsaver-filters-gaps)
-6. [`tsaver report`](#tsaver-report)
-7. [`tsaver retrieve`](#tsaver-retrieve)
-8. [`tsaver init --claude`](#tsaver-init---claude)
-9. [`tsaver graph`](#tsaver-graph)
-10. [`tsaver dashboard`](#tsaver-dashboard)
-11. [Custom filters](#custom-filters)
-12. [History storage](#history-storage)
-13. [Troubleshooting](#troubleshooting)
+1. [Why tsaver exists](#why-tsaver-exists)
+2. [Install](#install)
+3. [`tsaver run`](#tsaver-run)
+4. [`tsaver read`](#tsaver-read)
+5. [`tsaver mcp`](#tsaver-mcp)
+6. [`tsaver filters gaps`](#tsaver-filters-gaps)
+7. [`tsaver report`](#tsaver-report)
+8. [`tsaver retrieve`](#tsaver-retrieve)
+9. [`tsaver init --claude`](#tsaver-init---claude)
+10. [`tsaver graph`](#tsaver-graph)
+11. [`tsaver dashboard`](#tsaver-dashboard)
+12. [Custom filters](#custom-filters)
+13. [History storage](#history-storage)
+14. [Troubleshooting](#troubleshooting)
+
+---
+
+## Why tsaver exists
+
+AI coding agents like Claude Code spend a large share of their context window — and your token budget — reading raw command output that has nothing to do with the task at hand. A single `npm install` or `pytest` run can dump hundreds of lines of progress bars, repeated log lines, and install chatter into the conversation, and every one of those lines is tokens the model has to read before it can get to the one line that actually matters: the error, the failure, the summary.
+
+The same problem shows up in other forms: an MCP tool can return a JSON blob with megabytes of nested data when only a handful of fields are relevant; a PDF or Jupyter notebook an agent needs to read might be mostly formatting and binary overhead; a repo-wide grep for "where is this function used" burns several tool calls that a small local index could answer in one.
+
+tsaver sits between the agent and all of that noise. It wraps the commands an agent runs, compacts the data it reads, and keeps everything that got filtered out recoverable on disk — so you get the token savings without ever losing information for good. It runs entirely locally: no data leaves your machine, there's no telemetry, and nothing needs a network connection to work.
+
+**Who this is for:** anyone running Claude Code (or another agent) against a real codebase, where routine commands — installs, test suites, builds, API calls — are quietly eating context on noise instead of signal. If you've ever watched an agent's context fill up with `PASSED` lines or spinner frames, that's the problem tsaver is built to fix.
 
 ---
 
