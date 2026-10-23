@@ -14,6 +14,7 @@ function readStdin() {
 export async function mcp(args) {
     let rest = args;
     let stats = false;
+    let pretty = false;
     let maxString;
     let maxArray;
     const positional = [];
@@ -21,6 +22,9 @@ export async function mcp(args) {
         const arg = rest[i];
         if (arg === "--stats") {
             stats = true;
+        }
+        else if (arg === "--pretty") {
+            pretty = true;
         }
         else if (arg === "--max-string") {
             maxString = Number(rest[++i]);
@@ -43,7 +47,7 @@ export async function mcp(args) {
         return 1;
     }
     const compacted = compactJson(parsed, { maxString, maxArray });
-    const outputText = JSON.stringify(compacted, null, 2);
+    const outputText = pretty ? JSON.stringify(compacted, null, 2) : JSON.stringify(compacted);
     process.stdout.write(outputText + "\n");
     if (stats) {
         printStats(statsForText(rawText), statsForText(outputText));

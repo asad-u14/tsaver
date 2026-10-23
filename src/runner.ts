@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import readline from "node:readline";
 import type { Filter } from "./filters/types.js";
 import { Stats } from "./stats.js";
+import { stripAnsi } from "./ansi.js";
 
 export interface RunResult {
   exitCode: number | null;
@@ -30,7 +31,7 @@ function pump(
     rl.on("line", (line) => {
       rawStats.addLine(line);
       rawChunks.push(line);
-      filter.processLine(line, emit);
+      filter.processLine(stripAnsi(line), emit);
     });
     rl.on("close", () => {
       filter.flush(emit);

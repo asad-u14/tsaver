@@ -141,20 +141,22 @@ History entry: `kind: "read"`, with `rawPath` set to the original absolute path 
 ## `tsaver mcp`
 
 ```
-tsaver mcp [--stats] [--max-string N] [--max-array N] [file]
+tsaver mcp [--stats] [--pretty] [--max-string N] [--max-array N] [file]
 ```
 
 Compacts a JSON document — e.g. a captured MCP tool response — while **guaranteeing the output stays valid JSON**. Reads from `file` if given, otherwise stdin.
 
 - Strings longer than `--max-string` (default **500**) are truncated with an inline `"...(N more chars)"` suffix.
 - Arrays longer than `--max-array` (default **20**) keep the **first 3 and last 3** items and splice in a single string marker (`"...(N more items)"`) describing how many were dropped.
-- Objects and nested values are processed recursively.
+- Objects with more than `--max-array` keys get the same treatment — first 3 and last 3 entries kept, the rest replaced with a single `"...(N more keys)"` marker key. This covers large object-keyed payloads (e.g. an npm registry response's `versions` map) that array-only truncation used to miss entirely.
+- Output is **minified by default** — no indentation, since nothing reading it needs to be human-formatted. Pass `--pretty` for indented output when debugging interactively.
 - If the input isn't valid JSON, tsaver reports the parse error and exits 1 without writing anything.
 
 ### Examples
 ```bash
 curl -s https://api.example.com/big-response.json | tsaver mcp --stats
 tsaver mcp --stats --max-string 200 --max-array 10 response.json
+tsaver mcp --pretty response.json   # indented output for manual inspection
 ```
 
 History entry: `kind: "mcp"`, label is the file path or `<stdin>`, `rawText` holds the original uncompacted JSON text (recoverable via `retrieve`).

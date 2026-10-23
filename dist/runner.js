@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import readline from "node:readline";
 import { Stats } from "./stats.js";
+import { stripAnsi } from "./ansi.js";
 function pump(stream, filter, rawStats, filteredStats, rawChunks, filteredChunks, write) {
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
     const emit = (line) => {
@@ -12,7 +13,7 @@ function pump(stream, filter, rawStats, filteredStats, rawChunks, filteredChunks
         rl.on("line", (line) => {
             rawStats.addLine(line);
             rawChunks.push(line);
-            filter.processLine(line, emit);
+            filter.processLine(stripAnsi(line), emit);
         });
         rl.on("close", () => {
             filter.flush(emit);

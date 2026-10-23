@@ -16,6 +16,7 @@ function readStdin(): Promise<string> {
 export async function mcp(args: string[]): Promise<number> {
   let rest = args;
   let stats = false;
+  let pretty = false;
   let maxString: number | undefined;
   let maxArray: number | undefined;
 
@@ -24,6 +25,8 @@ export async function mcp(args: string[]): Promise<number> {
     const arg = rest[i];
     if (arg === "--stats") {
       stats = true;
+    } else if (arg === "--pretty") {
+      pretty = true;
     } else if (arg === "--max-string") {
       maxString = Number(rest[++i]);
     } else if (arg === "--max-array") {
@@ -45,7 +48,7 @@ export async function mcp(args: string[]): Promise<number> {
   }
 
   const compacted = compactJson(parsed, { maxString, maxArray });
-  const outputText = JSON.stringify(compacted, null, 2);
+  const outputText = pretty ? JSON.stringify(compacted, null, 2) : JSON.stringify(compacted);
   process.stdout.write(outputText + "\n");
 
   if (stats) {

@@ -17,10 +17,18 @@ function compactArray(value, opts) {
     return [...head, `...(${dropped} more items)`, ...tail];
 }
 function compactObject(value, opts) {
+    const compactedEntries = Object.entries(value).map(([key, v]) => [key, compactJson(v, opts)]);
+    if (compactedEntries.length <= opts.maxArray)
+        return Object.fromEntries(compactedEntries);
+    const head = compactedEntries.slice(0, ARRAY_EDGE_KEEP);
+    const tail = compactedEntries.slice(-ARRAY_EDGE_KEEP);
+    const dropped = compactedEntries.length - head.length - tail.length;
     const out = {};
-    for (const [key, v] of Object.entries(value)) {
-        out[key] = compactJson(v, opts);
-    }
+    for (const [key, v] of head)
+        out[key] = v;
+    out[`...(${dropped} more keys)`] = null;
+    for (const [key, v] of tail)
+        out[key] = v;
     return out;
 }
 export function compactJson(value, opts = {}) {

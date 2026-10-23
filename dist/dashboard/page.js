@@ -28,7 +28,7 @@ export function renderPage() {
   <h1>TSaver Dashboard</h1>
   <div class="tiles" id="tiles"></div>
   <table id="table">
-    <thead><tr><th>Time</th><th>Kind</th><th>Label</th><th>Raw → Filtered (bytes)</th><th>Reduction</th><th>Tokens saved</th></tr></thead>
+    <thead><tr><th>Time</th><th>Kind</th><th>Label</th><th>Raw → Filtered (bytes)</th><th>Reduction</th><th>Tokens used</th><th>Tokens saved</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
   <div id="empty" class="empty" style="display:none">No history yet. Run \`tsaver run\`, \`tsaver read\`, or \`tsaver mcp\` to populate this.</div>
@@ -73,6 +73,7 @@ async function load() {
   for (const entry of history.slice().reverse()) {
     const tr = document.createElement('tr');
     const pct = entry.stats.rawBytes === 0 ? 0 : (1 - entry.stats.filteredBytes / entry.stats.rawBytes) * 100;
+    const tokensUsed = entry.stats.filteredWords;
     const tokensSaved = entry.stats.rawWords - entry.stats.filteredWords;
     tr.innerHTML =
       '<td class="mono">' + new Date(entry.timestamp).toLocaleString() + '</td>' +
@@ -80,6 +81,7 @@ async function load() {
       '<td class="mono">' + escapeHtml(entry.label) + '</td>' +
       '<td class="mono">' + entry.stats.rawBytes + ' → ' + entry.stats.filteredBytes + '</td>' +
       '<td>' + pct.toFixed(1) + '%</td>' +
+      '<td class="mono">' + tokensUsed.toLocaleString() + '</td>' +
       '<td class="mono">' + tokensSaved.toLocaleString() + '</td>';
     rows.appendChild(tr);
   }

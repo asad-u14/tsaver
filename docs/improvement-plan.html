@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tsaver — improvement plan</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-elevated: #ffffff;
+    --surface: #f6f7f9;
+    --surface-hover: #eef0f3;
+    --border: #e4e7ec;
+    --border-strong: #d0d5dd;
+    --text: #0f1419;
+    --text2: #5c6370;
+    --text3: #8b93a3;
+    --accent: #0c8a7b;
+    --accent-soft: #e6f5f2;
+    --code-bg: #f1f3f6;
+    --code-border: #e4e7ec;
+    --warn-bg: #fdf6e8;
+    --warn-border: #ecc865;
+    --warn-strong: #8a5a06;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+    --good: #0ca30c;
+    --status-serious: #ec835a;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0c10;
+    --bg-elevated: #10131a;
+    --surface: #131720;
+    --surface-hover: #1a1f2a;
+    --border: #212631;
+    --border-strong: #2d333f;
+    --text: #e7e9ee;
+    --text2: #9aa3b2;
+    --text3: #6b7280;
+    --accent: #5eead4;
+    --accent-soft: #10292a;
+    --code-bg: #0e1117;
+    --code-border: #1f2430;
+    --warn-bg: #211a0d;
+    --warn-border: #4a3a12;
+    --warn-strong: #f2c94c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.25);
+    --good: #0ca30c;
+    --status-serious: #ec835a;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .page { max-width: 880px; margin: 0 auto; padding: 56px 40px 100px; }
+
+  .top-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
+  .eyebrow { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin: 0 0 10px; }
+  h1 { font-size: 27px; font-weight: 700; letter-spacing: -0.015em; margin: 0 0 10px; }
+  .subtitle { color: var(--text2); font-size: 15px; line-height: 1.6; margin: 0 0 8px; max-width: 660px; }
+  .meta { color: var(--text3); font-size: 12.5px; margin-bottom: 36px; }
+
+  #theme-toggle button {
+    font-size: 12.5px; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--border-strong);
+    background: var(--surface); color: var(--text); cursor: pointer; font-family: inherit; white-space: nowrap;
+  }
+  #theme-toggle button:hover { border-color: var(--accent); background: var(--surface-hover); }
+
+  h2 {
+    font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin: 52px 0 6px;
+    padding-top: 20px; border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+  .section-dek { color: var(--text2); font-size: 14px; margin: 0 0 22px; max-width: 620px; line-height: 1.6; }
+  h3 { font-size: 14.5px; font-weight: 700; margin: 24px 0 10px; }
+  p { line-height: 1.65; font-size: 14.5px; margin: 0 0 14px; }
+  ul, ol { font-size: 14.5px; line-height: 1.65; margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg); border: 1px solid var(--code-border);
+    padding: 1.5px 5px; border-radius: 4px; font-size: 12.5px;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 12px; line-height: 1.55; margin: 0 0 16px; box-shadow: var(--shadow);
+  }
+  pre code { background: none; border: none; padding: 0; }
+  a { color: var(--accent); }
+
+  .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 100px; }
+  .pill.high { background: var(--accent-soft); color: var(--accent); }
+  .pill.med { background: var(--warn-bg); color: var(--warn-strong); }
+  .pill.low { background: var(--surface); color: var(--text3); }
+  .pill.done { background: var(--accent-soft); color: var(--accent); }
+
+  .done-note {
+    position: relative; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px;
+    padding: 13px 16px 13px 44px; font-size: 13.5px; line-height: 1.6; margin: 4px 0 16px;
+  }
+  .done-note::before {
+    content: "✓"; position: absolute; left: 15px; top: 13px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); color: var(--bg-elevated); font-size: 11px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .done-note strong { color: var(--accent); }
+
+  .item-card {
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 22px; box-shadow: var(--shadow); margin: 20px 0;
+  }
+  .item-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .item-num { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: var(--text3); font-weight: 700; }
+  .item-title { font-size: 15.5px; font-weight: 700; margin: 0; }
+
+  .note {
+    position: relative; background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px;
+    padding: 13px 16px 13px 44px; font-size: 13.5px; line-height: 1.6; margin: 4px 0 16px;
+  }
+  .note::before {
+    content: "!"; position: absolute; left: 15px; top: 13px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--warn-strong); color: var(--warn-bg); font-size: 12px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; font-family: ui-monospace, monospace;
+  }
+  .note strong { color: var(--warn-strong); }
+
+  .skip-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; margin: 12px 0; font-size: 13.5px; color: var(--text2);
+  }
+  .skip-card strong { color: var(--text); }
+
+  .source-tag {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+    color: var(--text3); background: var(--surface); border: 1px solid var(--border);
+    padding: 3px 9px; border-radius: 100px; margin: 0 6px 6px 0;
+  }
+
+  footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text3); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="top-row">
+    <div>
+      <p class="eyebrow">Improvement plan</p>
+      <h1>What's actually worth fixing next</h1>
+    </div>
+    <div id="theme-toggle"><button id="theme-toggle-btn" type="button" onclick="toggleTheme()">🌙 Dark</button></div>
+  </div>
+  <p class="subtitle">A deep pass through every token-saving surface in tsaver — filters, the MCP JSON compactor, the file optimizers, and levers beyond filtering (caching, just-in-time retrieval, real token budgets, session memory) — ranked by real token impact, not cosmetic cleanup. Not yet implemented; this is the plan.</p>
+  <p class="meta">Based on reading <code>src/mcpCompact.ts</code>, <code>src/filters/*.ts</code>, <code>src/fileopt/*.ts</code>, <code>src/graph/*.ts</code>, the project's own <a href="token-savings-report.html">token savings report</a>, and external research into JFrog Boost, Anthropic's agent context-engineering guidance, and aider's repo-map algorithm (see "What other tools do" below).</p>
+
+  <h2 id="priority-0">0. Dashboard has no per-row tokens-used/tokens-saved columns <span class="pill done">Done</span></h2>
+  <p class="section-dek"><span class="pill high">Top priority</span> — the dashboard already computes this number per-entry for the summary tiles; it just isn't surfaced per-row.</p>
+  <div class="item-card">
+    <p><code>src/dashboard/page.ts</code>'s table currently shows <strong>Raw → Filtered (bytes)</strong>, <strong>Reduction</strong>, and a single <strong>Tokens saved</strong> column (computed inline per-row as <code>entry.stats.rawWords - entry.stats.filteredWords</code>, line 76). That's half the picture — it shows what was saved, but not what the line <em>actually cost</em> after filtering, i.e. <code>filteredWords</code> itself. An agent or a user scanning the table can't currently tell, at a glance, which rows are still expensive even after compaction (a filtered MCP response that's still 5,000 words) versus which rows are cheap and already near-zero.</p>
+    <p><code>HistoryStats</code> in <code>src/history.ts</code> already stores <code>rawWords</code> and <code>filteredWords</code> per entry — the data needed for both columns is already captured and sent over <code>/api/history</code>. This is a presentation-layer fix, not a data-model change.</p>
+    <p><strong>Fix:</strong> split the single "Tokens saved" column into two — <strong>Tokens used</strong> (<code>filteredWords</code>, what the agent's context actually paid after filtering) and <strong>Tokens saved</strong> (kept as-is, the delta). Add the equivalent split to the CSS <code>kind-*</code> styling so both read clearly at a glance; no backend/API change needed since <code>entry.stats</code> already carries both numbers.</p>
+    <div class="done-note"><strong>Implemented and verified.</strong> <code>src/dashboard/page.ts</code>'s table header and row renderer now show both <strong>Tokens used</strong> (<code>entry.stats.filteredWords</code>) and <strong>Tokens saved</strong> (the existing delta) as separate columns. No API/backend change was needed — <code>/api/history</code> already returns both fields on every entry. Verified by running the dashboard server locally and confirming both columns render against real <code>run</code>/<code>mcp</code> history entries.</div>
+  </div>
+
+  <h2 id="priority-1">1. MCP compaction doesn't truncate object-keyed JSON <span class="pill done">Done</span></h2>
+  <p class="section-dek"><span class="pill high">High impact</span> — this is the one documented regression in tsaver's own benchmark report.</p>
+  <div class="item-card">
+    <p><code>compactArray</code> in <code>src/mcpCompact.ts</code> (lines 16–24) truncates arrays to head/tail items. <code>compactObject</code> (lines 26–35) just recurses into every key with no limit at all. Real MCP/API payloads keyed by ID — npm's <code>versions</code> map, time-series objects, anything object-shaped instead of array-shaped — pass through completely untouched.</p>
+    <div class="note"><strong>Confirmed by the project's own data:</strong> the token savings report's npm-registry (<code>express</code> package) scenario is exactly this case — an 823,555-byte payload came out at 1,186,118 bytes through <code>tsaver mcp</code>, a 44% regression, because its bulk lives in <code>versions</code>/<code>time</code> objects, not arrays.</div>
+    <p><strong>Fix:</strong> generalize the array truncation to large objects. When an object has more than <code>maxArray</code> keys, keep a head/tail slice of keys (same edge-keep logic as arrays) and drop the rest behind an <code>"...(N more keys)"</code> marker.</p>
+    <div class="done-note"><strong>Implemented and verified.</strong> <code>compactObject</code> now applies the same head/tail-key truncation as <code>compactArray</code>. Tested against a reproduction of the exact regression shape (a 290-entry version-keyed object): 28,237 → 964 bytes, a 96.6% reduction — the same payload shape that previously grew by 44% now compacts correctly. Small objects and the existing array path were re-verified unchanged.</div>
+  </div>
+
+  <h2 id="priority-2">2. MCP output always pretty-prints with 2-space indent <span class="pill done">Done</span></h2>
+  <p class="section-dek"><span class="pill high">High impact</span> — pure overhead on every single <code>tsaver mcp</code> run, scales with nesting depth.</p>
+  <div class="item-card">
+    <p><code>src/commands/mcp.ts</code> line 46 always does <code>JSON.stringify(compacted, null, 2)</code>. Indentation costs real tokens an LLM never needs — nobody reads MCP output visually in-context. In the regression case above, pretty-printing alone inflated 1 raw line into 41,050 formatted lines.</p>
+    <p><strong>Fix:</strong> default to minified JSON output; add an opt-in <code>--pretty</code> flag for humans debugging interactively. Combined with fix #1, this should turn the object-keyed regression into a real win instead of a loss.</p>
+    <div class="done-note"><strong>Implemented and verified.</strong> Output is minified by default (<code>JSON.stringify(compacted)</code>); <code>--pretty</code> restores the old indented behavior. On the same test payload, minified output pushed the reduction from 96.6% (pretty) to 97.8% (minified) — combined with fix #1, the documented regression is now a win on the same payload shape. <code>docs/USAGE.md</code> and <code>docs/index.html</code> updated to document the new flag.</div>
+  </div>
+
+  <h2 id="priority-3">3. The npm filter never actually collapses repeated lines <span class="pill done">Done</span></h2>
+  <p class="section-dek"><span class="pill med">Medium impact</span> — not visible in the current benchmark report because its "quiet install" test case has no repeated noise to begin with.</p>
+  <div class="item-card">
+    <p><code>src/filters/npm.ts</code> lines 11–15: both branches of the <code>if</code> call <code>emit(line)</code> — identical behavior either way. The filter only drops notice/timing/spinner lines; it never collapses runs of repeated output the way <code>GenericFilter</code> and <code>CustomFilter</code> do. <code>CustomFilter</code> already uses <code>RepeatCollapser</code> (<code>src/filters/custom.ts</code> line 14) for exactly this.</p>
+    <p><strong>Fix:</strong> wire <code>RepeatCollapser</code> into <code>NpmFilter</code> so long runs of repeated deprecation warnings or audit lines collapse the same way other filters' repeated output does.</p>
+    <div class="done-note"><strong>Implemented and verified — including a bug caught during testing.</strong> The first pass kept the old <code>KEEP_RE</code> gate, which routed every "npm warn"/"npm error" line straight to <code>emit</code>, bypassing the collapser entirely — meaning repeated deprecation warnings (the actual noisy case) still never collapsed. Fixed by routing <em>all</em> non-dropped lines through <code>RepeatCollapser</code> unconditionally — it already flushes immediately on any line change, so a genuine one-off error/warning is never delayed or hidden. Verified against a script with 11 repeated deprecation warnings plus a real error and summary line: line reduction went from 0% (first pass, bug) to 78.6% (bytes 81.5%, words 78.0%), with the error and summary lines surviving untouched.</div>
+  </div>
+
+  <h2 id="research">What other tools do — researched externally</h2>
+  <p class="section-dek">Pulled directly from JFrog Boost's own documentation, Anthropic's published context-engineering guidance for agents, and aider's repo-map documentation — then checked against what tsaver's code actually does today.</p>
+  <div>
+    <span class="source-tag">JFrog Boost docs</span>
+    <span class="source-tag">Anthropic: effective context engineering for AI agents</span>
+    <span class="source-tag">aider repo-map docs</span>
+  </div>
+  <p>Boost strips ANSI escape codes as a named technique, ships filter profiles for 100+ tools (<code>git</code>, <code>docker</code>, <code>go</code>, <code>cargo</code>, <code>gh</code>, <code>kubectl</code> among them — tsaver has 2), and auto-disables a filter once an agent retrieves its full original 3+ times in a row. Anthropic's guidance frames the core lever as <em>just-in-time retrieval</em> — returning lightweight pointers instead of bulk content wherever possible. aider's repo map doesn't dump a symbol list; it ranks symbols with a PageRank-style graph algorithm under a fixed token budget (1K tokens by default) so only the symbols other code actually depends on survive the cut.</p>
+
+  <h2 id="priority-4">4. No ANSI escape code stripping anywhere <span class="pill done">Done</span></h2>
+  <p class="section-dek"><span class="pill high">High impact</span> — a directly-confirmed Boost technique tsaver has no equivalent of at all.</p>
+  <div class="item-card">
+    <p>Checked <code>src/filters/generic.ts</code>, <code>src/filters/pytest.ts</code>, and <code>src/filters/npm.ts</code> — none strip ANSI color/cursor-control escape sequences (<code>\x1b[...m</code> and friends). Real CI output from colored test runners and progress bars carries these bytes straight through every filter untouched, inflating byte/token counts on every line that uses color, independent of whatever line-level filtering already happens.</p>
+    <p><strong>Fix:</strong> strip ANSI escape sequences as a pre-processing step before a line reaches any filter's <code>processLine</code> — one shared regex, applied once in <code>runner.ts</code>'s line pump rather than duplicated per filter.</p>
+    <div class="done-note"><strong>Implemented and verified.</strong> New <code>src/ansi.ts</code> exports <code>stripAnsi</code> (CSI + OSC escape sequence regex, based on the standard <code>ansi-regex</code> pattern, including terminal hyperlink sequences). Wired into <code>runner.ts</code>'s line pump so every filter now sees clean text — raw stats/history still record the true original bytes, only the filter's input is stripped. Tested against a real colored-output script (30 PASS lines + 1 FAILED, ANSI color codes varying per line): reduction improved from 75.5% to 82.4% bytes on identical input, with the filtered output now free of leftover escape bytes.</div>
+  </div>
+
+  <h2 id="priority-5">5. No adaptive filter disabling when a filter is repeatedly retrieved in full</h2>
+  <p class="section-dek"><span class="pill med">Medium impact</span> — closes a named Boost gap and is a genuine token-economics issue, not just feature parity.</p>
+  <div class="item-card">
+    <p>If an agent keeps calling <code>tsaver retrieve &lt;id&gt;</code> to get the full original after a given filter ran, that filter is net-negative: its compaction cost an extra round-trip to undo. Boost auto-disables a filter after 3 such retrievals. tsaver's <code>history.ts</code> records entries and <code>commands/retrieve.ts</code> reads them back, but nothing feeds retrieval frequency back into <code>selectFilter</code> in <code>src/filters/index.ts</code>.</p>
+    <p><strong>Fix:</strong> track per-filter retrieval counts in history, and when a filter's recent output has been retrieved in full 3+ times, fall back to passing output through unfiltered (with a note) until the pattern stops.</p>
+  </div>
+
+  <h2 id="priority-6">6. Filter coverage is thin — only pytest and npm have dedicated profiles</h2>
+  <p class="section-dek"><span class="pill med">Medium impact</span> — extends real coverage the same way Boost's "100+ tools" claim is built: one keep/drop/collapse profile per tool.</p>
+  <div class="item-card">
+    <p><code>src/filters/index.ts</code> only maps <code>pytest</code>/<code>py.test</code> and <code>npm</code> to dedicated filters; everything else falls through to <code>GenericFilter</code>. <code>git</code>, <code>go test</code>, and <code>cargo</code> each have very recognizable, high-volume noise patterns — git's status/log boilerplate, go test's <code>=== RUN</code>/<code>--- PASS</code> lines, cargo's <code>Compiling N/M</code> progress — that a generic fallback handles worse than a purpose-built profile, the same way the pytest-specific profile already outperforms generic for pytest's own output.</p>
+    <p><strong>Fix:</strong> add <code>GoTestFilter</code>, <code>CargoFilter</code>, and a <code>GitFilter</code> following the same keep/drop/collapse pattern as <code>PytestFilter</code>/<code>NpmFilter</code>, registered in <code>BUILTIN_PROFILES</code>.</p>
+  </div>
+
+  <h2 id="priority-7">7. <code>graph query</code> has no relevance ranking</h2>
+  <p class="section-dek"><span class="pill low">Lower priority</span> — more design work than the others, but the one idea with no tsaver equivalent at all.</p>
+  <div class="item-card">
+    <p><code>src/graph/query.ts</code> lines 73–79 slice the first 50 references in file-scan order — no notion of which symbol matters more. aider's repo map instead runs a graph-ranking algorithm (effectively PageRank over a file-dependency graph) so symbols referenced by many files outrank one-off helpers, under a fixed token budget. tsaver's cap can currently keep 50 low-signal references while truncating ones that actually matter.</p>
+    <p><strong>Fix:</strong> weight <code>queryGraph</code>'s results by reference count (or file-level in-degree) before truncating, so the kept slice favors widely-used symbols over incidental matches.</p>
+  </div>
+
+  <h2 id="language">Is JavaScript/TypeScript the right language for this?</h2>
+  <p class="section-dek">A deliberate check, not an assumption — researched by looking at what comparable tools are actually built in and measuring tsaver's own runtime behavior.</p>
+  <div>
+    <span class="source-tag">JFrog Boost (compiled Go binary)</span>
+    <span class="source-tag">ripgrep (Rust)</span>
+    <span class="source-tag">sharp vs. jimp benchmarks</span>
+    <span class="source-tag">measured on this machine</span>
+  </div>
+  <div class="item-card">
+    <p><strong>What was measured:</strong> <code>tsaver --help</code> via the compiled <code>dist/cli.js</code> takes ~270–290ms per invocation on this machine — almost entirely Node process startup, not tsaver's own logic. <code>node_modules</code> is 156MB across 47 packages (<code>pdf-parse</code> alone is 21MB). Every hot path in the codebase — <code>filters/*.ts</code>, <code>mcpCompact.ts</code>, <code>graph/extract.ts</code> — is regex matching over lines or walking a parsed JSON tree. None of it is CPU-bound in a way that benefits from a faster language.</p>
+    <p><strong>What comparable tools use, and why:</strong> Boost — the tool tsaver was explicitly inspired by — ships as a compiled Go binary with no runtime dependency, which is almost certainly why it can claim "no install step, no startup lag." ripgrep is written in Rust specifically for SIMD-accelerated regex matching and lock-free parallel directory traversal at scale — a genuinely CPU-bound workload. <code>sharp</code> wraps native <code>libvips</code> and benchmarks 4–5x faster than ImageMagick for resizing; tsaver uses pure-JS <code>jimp</code> instead, correct but slower and heavier than necessary for a task Node doesn't accelerate on its own.</p>
+    <div class="note"><strong>The honest conclusion: tsaver's workload doesn't justify a rewrite.</strong> The bottleneck is subprocess-spawn + Node startup overhead (~250ms), not algorithm execution — and that overhead is invisible next to the child processes tsaver actually wraps (<code>npm install</code>, <code>pytest</code>, etc.), which themselves take seconds. Rewriting the whole CLI in Go or Rust would fix a problem tsaver doesn't currently have, while leaving the actual problems (object-key truncation, ANSI stripping, thin filter coverage — items 1–7 above) exactly where they are.</div>
+    <p><strong>Where language choice would start to matter, if tsaver's usage pattern changes:</strong></p>
+    <ul>
+      <li><strong>Startup latency at scale.</strong> <code>tsaver init --claude</code>'s hook wraps <em>every</em> Bash call Claude Code makes. 250ms × hundreds of calls per session adds up in a way a single compiled binary (sub-10ms startup) would not. This is the one legitimate argument for a rewrite, and it's the same architectural bet Boost already made.</li>
+      <li><strong>Distribution friction.</strong> The README documents real install pain — git clone + <code>npm link</code> is the only reliable path, because <code>npm install -g git+ssh://...</code> 404s on some corporate networks. A static binary removes npm/Node as an install-time dependency entirely, mirroring Boost's own <code>install.sh</code> approach.</li>
+      <li><strong><code>graph/extract.ts</code>'s regex-based parsing.</strong> The closest thing to real CPU-bound work in the codebase, and at large-repo scale the bigger win is a real parser (tree-sitter, available as native bindings in both Rust and JS) for correctness, not a faster language for speed.</li>
+    </ul>
+    <p><strong>Recommendation:</strong> keep TypeScript. If startup latency under the Claude Code hook becomes a felt problem later, the incremental fix is compiling the existing TS codebase into a single binary (e.g. <code>bun build --compile</code>) rather than a full Go/Rust port — same source, no Node startup cost, no 156MB <code>node_modules</code> in the runtime path.</p>
+  </div>
+
+  <h2 id="beyond-filtering">Beyond filtering: other ways to save tokens</h2>
+  <p class="section-dek">Everything above works on one lever — filter the output harder after it's already been captured in full. These work on different levers entirely: avoid redoing work, send less in the first place, budget against a real token count, and catch repetition filtering can't see.</p>
+
+  <h3 id="priority-8">8. No caching or dedup — the same work gets redone every time</h3>
+  <div class="item-card">
+    <p><code>src/fileopt/cache.ts</code>'s <code>writeCache</code> re-extracts and rewrites the cache file on <em>every</em> call, with no check for whether the source file changed since the last read — relevant because <code>init --claude</code>'s Read hook can fire on the same PDF/notebook repeatedly in one session. Separately, <code>tsaver run</code> has no dedup across history: running the same command twice (<code>git status</code>, <code>npm test</code>) with identical output filters and stores both independently, with nothing checking "is this identical to a recent entry." Same gap in <code>commands/mcp.ts</code> — repeated identical MCP queries get compacted fresh every time with no memoization.</p>
+    <p><strong>Fix:</strong> hash the source file's content/mtime before re-extracting in <code>writeCache</code>; add a content-hash short-circuit in <code>run.ts</code>/<code>mcp.ts</code> that can report "identical to history entry &lt;id&gt;" instead of re-emitting the same filtered block.</p>
+  </div>
+
+  <h3 id="priority-9">9. Everything is bulk-capture-then-filter — nothing is just-in-time except <code>graph query</code></h3>
+  <div class="item-card">
+    <p>This is Anthropic's core context-engineering lever (return pointers, fetch on demand) and tsaver mostly does the opposite: capture everything, filter after. <code>graph/query.ts</code> already gets this right — it returns <code>file:line</code> pointers, not full bodies. Nothing else does. <code>tsaver read</code> on a PDF/notebook always extracts the <em>whole</em> document even if the agent only needs one section. <code>runner.ts</code>'s <code>pump</code> buffers every line of a run into memory with no cap — a long-running or watch-mode command has no early-exit ceiling, so one runaway command can cost far more context than any filter ratio justifies.</p>
+    <p><strong>Fix:</strong> add a <code>tsaver read --pages N-M</code> / <code>--query &lt;term&gt;</code> option for partial extraction; add a hard byte/line ceiling to <code>pump</code> with a "truncated — use <code>tsaver retrieve</code> for the rest" message once exceeded.</p>
+  </div>
+
+  <h3 id="priority-10">10. Truncation thresholds are tuned against a proxy, not real tokens</h3>
+  <div class="item-card">
+    <p><code>stats.ts</code>'s word count is an explicitly-disclosed whitespace-split proxy, not a real tokenizer — but <code>mcpCompact.ts</code>'s <code>DEFAULT_MAX_STRING = 500</code> and <code>DEFAULT_MAX_ARRAY = 20</code> are flat constants applied identically regardless of content type. A base64 image blob embedded in a JSON payload (a real MCP response shape) costs far more tokens per character than English prose, but gets the same 500-char allowance.</p>
+    <p><strong>Fix:</strong> swap the proxy for a real BPE-style token estimate when deciding truncation thresholds; apply a much more aggressive cap specifically for strings that look like base64/binary data (detectable by charset density) rather than one flat limit for all strings.</p>
+  </div>
+
+  <h3 id="priority-11">11. Repeat-collapsing only catches identical lines, not structurally-similar blocks</h3>
+  <div class="item-card">
+    <p><code>GenericFilter</code>'s repeat detection (and <code>RepeatCollapser</code>) only collapses consecutive lines that are identical after digit-normalization. It won't catch the common real case of multiple test failures with the <em>same exception type and similar traceback shape</em> but different line numbers/variable names across blocks — a pattern that's structurally repetitive but not line-for-line identical, which exact-match collapsing can't see.</p>
+    <p><strong>Fix:</strong> add a fuzzy/structural similarity check across multi-line blocks (not just single lines) for grouping near-identical failures, on top of the existing exact-match collapsing.</p>
+  </div>
+
+  <h3 id="priority-12">12. No session-level memory of "nothing changed since last time"</h3>
+  <div class="item-card">
+    <p>Maps to Anthropic's "tool result clearing" idea. If an agent runs <code>git status</code> five times in a session and output 2–4 are unchanged, each one still gets fully filtered and re-emitted. tsaver's full history log (<code>history.ts</code>) exists but nothing short-circuits a repeat call against recent identical output within the same session.</p>
+    <p><strong>Fix:</strong> a lightweight ring buffer of the last N command+output hashes (separate from the permanent history log) that lets <code>run.ts</code> emit "unchanged since last run" instead of the full filtered output when a hash matches.</p>
+  </div>
+
+  <div class="skip-card"><strong>LLM-assisted summarization of large outputs.</strong> Would compress far more aggressively than regex filtering ever can, but requires a network call to a model — directly against tsaver's "no network calls, fully local" design goal from the README. Named here as a deliberate scope exclusion, not an oversight.</div>
+
+  <h2 id="not-doing">Looked at, not worth doing now</h2>
+  <div class="skip-card"><strong>GenericFilter's inline repeat-collapsing vs. reusing <code>RepeatCollapser</code>.</strong> Code duplication, not a token-savings problem — skip.</div>
+  <div class="skip-card"><strong>PDF/notebook/image optimizers.</strong> Already close to the ceiling — 99.9% byte reduction on a real 2 MB PDF per the token savings report. Nothing to gain here.</div>
+  <div class="skip-card"><strong><code>graph query</code> reference capping.</strong> Already caps at 50 references with a count of the rest — fine as-is.</div>
+
+  <h2 id="next">Suggested order</h2>
+  <ol>
+    <li><s>Fix #0 (dashboard tokens-used/tokens-saved columns)</s> — <strong>done</strong>, verified against real history entries.</li>
+    <li><s>Fix #1 (object-key truncation in <code>mcpCompact.ts</code>)</s> — <strong>done</strong>, verified against the documented failure case.</li>
+    <li><s>Fix #2 (minified output by default)</s> — <strong>done</strong>, verified alongside #1; the regression case now compacts instead of growing.</li>
+    <li><s>Fix #4 (ANSI stripping)</s> — <strong>done</strong>, verified against a real colored-output script (75.5% → 82.4% reduction on identical input).</li>
+    <li><s>Fix #3 (wire <code>RepeatCollapser</code> into <code>NpmFilter</code>)</s> — <strong>done</strong>; caught and fixed a real gating bug during verification (see item #3's done-note).</li>
+    <li>Fix #6 (<code>git</code>/<code>go test</code>/<code>cargo</code> filter profiles) — same pattern as existing filters, no new concepts. <strong>Up next.</strong></li>
+    <li>Fix #5 (adaptive filter disabling on repeated retrieval) — needs the retrieval-tracking plumbing first.</li>
+    <li>Fix #8 (caching/dedup for file reads and MCP queries) — removes redundant work, independent of the filtering fixes above.</li>
+    <li>Fix #12 (session-level "unchanged since last run" memory) — pairs naturally with #8's hashing work.</li>
+    <li>Fix #7 (graph query ranking) — design work, lowest urgency among the filtering fixes.</li>
+    <li>Fix #9 (just-in-time partial reads, capped run buffering) — larger surface change, needs new CLI flags.</li>
+    <li>Fix #10 (real token-count-based thresholds) — valuable but needs a tokenizer dependency decision first.</li>
+    <li>Fix #11 (structural/fuzzy repeat detection) — most algorithmically involved, do last.</li>
+  </ol>
+
+  <footer>tsaver — local-first, no telemetry, no network calls. See the <a href="index.html">full usage reference</a>, the <a href="token-savings-report.html">token savings report</a>, and the <a href="boost-comparison-report.html">Boost comparison</a>.</footer>
+</div>
+<script>
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const btn = document.getElementById("theme-toggle-btn");
+  if (btn) btn.textContent = theme === "dark" ? "☀️ Light" : "🌙 Dark";
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  const next = current === "dark" ? "light" : "dark";
+  try { localStorage.setItem("tsaver-docs-theme", next); } catch {}
+  applyTheme(next);
+}
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem("tsaver-docs-theme"); } catch {}
+  applyTheme(saved === "dark" ? "dark" : "light");
+})();
+</script>
+</body>
+</html>

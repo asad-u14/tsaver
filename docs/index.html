@@ -276,6 +276,7 @@
     <a href="#install">Install</a>
     <a href="token-savings-report.html">Token savings report ↗</a>
     <a href="boost-comparison-report.html">vs. JFrog Boost ↗</a>
+    <a href="improvement-plan.html">Improvement plan ↗</a>
   </div>
 
   <div class="nav-group">
@@ -392,16 +393,18 @@ tsaver read screenshot.png</code></pre>
   <p>History entry: <code>kind: "read"</code>, <code>rawPath</code> set to the original file (so <code>retrieve</code> re-reads it instead of duplicating its bytes).</p>
 
   <h2 id="mcp">tsaver mcp</h2>
-  <span class="cmd-badge">tsaver mcp [--stats] [--max-string N] [--max-array N] [file]</span>
+  <span class="cmd-badge">tsaver mcp [--stats] [--pretty] [--max-string N] [--max-array N] [file]</span>
   <p>Compacts a JSON document — e.g. a captured MCP tool response — while <strong>guaranteeing the output stays valid JSON</strong>. Reads from <code>file</code> if given, otherwise stdin.</p>
   <ul>
     <li>Strings longer than <code>--max-string</code> (default <strong>500</strong>) truncated with an inline <code>"...(N more chars)"</code> suffix.</li>
     <li>Arrays longer than <code>--max-array</code> (default <strong>20</strong>) keep the first 3 and last 3 items, splicing in a <code>"...(N more items)"</code> marker.</li>
-    <li>Objects/nested values processed recursively.</li>
+    <li>Objects with more than <code>--max-array</code> keys get the same treatment — first 3 and last 3 entries kept, rest replaced with a <code>"...(N more keys)"</code> marker key.</li>
+    <li>Output is minified by default; pass <code>--pretty</code> for indented output.</li>
     <li>Invalid JSON input exits 1 with a parse error — nothing is written.</li>
   </ul>
   <pre><code>curl -s https://api.example.com/big-response.json | tsaver mcp --stats
-tsaver mcp --stats --max-string 200 --max-array 10 response.json</code></pre>
+tsaver mcp --stats --max-string 200 --max-array 10 response.json
+tsaver mcp --pretty response.json</code></pre>
 
   <h2 id="filters-gaps">tsaver filters gaps</h2>
   <span class="cmd-badge">tsaver filters gaps [--top N]</span>
