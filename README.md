@@ -7,7 +7,7 @@ Everything runs on-disk. No telemetry, no network calls, nothing leaves your mac
 ## Install
 
 ```bash
-git clone git@gitlab.com:ai-projects-14/tsaver.git
+git clone https://github.com/asad-u14/tsaver.git
 cd tsaver
 npm install
 npm run build
@@ -16,9 +16,12 @@ npm link
 
 `npm link` makes the `tsaver` command available globally.
 
-> **Note:** `npm install -g git+ssh://git@gitlab.com/...` does *not* work reliably for this repo — npm's git installer fetches GitLab packages via the `repository/archive.tar.gz` REST API rather than a real `git clone`, and that endpoint can 404 depending on your network/GitLab setup (observed on a corporate network with TLS interception). Clone + `npm link` above avoids that path entirely and is the supported install method.
+You can also install directly from GitHub without a separate clone step:
+```bash
+npm install -g github:asad-u14/tsaver
+```
 
-If you already ran the broken one-liner and ended up with a dangling `tsaver` command, clean it up first:
+If a previous install attempt left you with a dangling `tsaver` command, clean it up first:
 
 ```bash
 npm uninstall -g tsaver
@@ -40,7 +43,7 @@ rm -f "$(dirname "$(which node)")/tsaver"   # removes a leftover dangling symlin
 
 **Full reference, every flag and default, troubleshooting**: see [`docs/USAGE.md`](docs/USAGE.md) or open [`docs/index.html`](docs/index.html) in a browser.
 
-**Does it actually save tokens?** See [`docs/token-savings-report.html`](docs/token-savings-report.html) — six real, reproducible benchmarks with exact before/after numbers, including the one case (object-keyed JSON) where it currently makes things worse.
+**Does it actually save tokens?** See [`docs/token-savings-report.html`](docs/token-savings-report.html) — six real, reproducible benchmarks with exact before/after numbers. See also [`docs/improvement-plan.html`](docs/improvement-plan.html) for what's been fixed since and what's still planned.
 
 ## License
 

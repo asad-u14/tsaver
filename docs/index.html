@@ -316,13 +316,14 @@
   <p><strong>Who this is for:</strong> anyone running Claude Code (or another agent) against a real codebase, where routine commands — installs, test suites, builds, API calls — are quietly eating context on noise instead of signal. If you've ever watched an agent's context fill up with <code>PASSED</code> lines or spinner frames, that's the problem tsaver is built to fix.</p>
 
   <h2 id="install">Install</h2>
-  <pre><code>git clone git@gitlab.com:ai-projects-14/tsaver.git
+  <pre><code>git clone https://github.com/asad-u14/tsaver.git
 cd tsaver
 npm install
 npm run build
 npm link</code></pre>
   <p><code>npm link</code> makes the <code>tsaver</code> command available globally.</p>
-  <div class="note"><strong>Do not use</strong> <code>npm install -g git+ssh://git@gitlab.com/...</code>. npm's git installer fetches GitLab packages via the <code>repository/archive.tar.gz</code> REST API rather than a real <code>git clone</code>, and that endpoint can 404 on some networks (observed on a corporate network with TLS interception). Clone + <code>npm link</code> avoids this entirely.</div>
+  <p>Or install directly from GitHub without a separate clone step:</p>
+  <pre><code>npm install -g github:asad-u14/tsaver</code></pre>
   <p>To update later:</p>
   <pre><code>cd /path/to/your/tsaver/clone
 git pull
@@ -568,8 +569,8 @@ drop = ["^progress"]</code></pre>
 
   <h2 id="troubleshooting">Troubleshooting</h2>
 
-  <h3><code>npm install -g git+ssh://...</code> fails (404, SELF_SIGNED_CERT, extraction errors)</h3>
-  <p>npm fetches GitLab packages via <code>repository/archive.tar.gz</code> rather than a real clone, and that endpoint can 404 on networks with TLS-intercepting proxies. Use clone + <code>npm link</code> instead.</p>
+  <h3><code>npm install -g github:asad-u14/tsaver</code> fails (TLS/certificate or extraction errors)</h3>
+  <p>On networks with a TLS-intercepting proxy (common on some corporate networks), npm's git-dependency fetch can fail outright. Use clone + <code>npm link</code> instead — a plain <code>git clone</code> over HTTPS is less likely to hit that than npm's internal git-install path.</p>
 
   <h3><code>tsaver: command not found</code>, or it suddenly stops working</h3>
   <ul>
@@ -579,7 +580,7 @@ drop = ["^progress"]</code></pre>
   </ul>
 
   <h3><code>git pull</code>/<code>fetch</code> times out over SSH</h3>
-  <p>Some networks block outbound port 22. Fetch over HTTPS for one-off access: <code>git pull https://gitlab.com/ai-projects-14/tsaver.git main</code></p>
+  <p>Some networks block outbound port 22. Fetch over HTTPS for one-off access: <code>git pull https://github.com/asad-u14/tsaver.git main</code></p>
 
   <h3>The Claude Code hook doesn't seem to be filtering anything</h3>
   <p>Claude Code only reloads hook config at session start or when you open <code>/hooks</code> — editing <code>~/.claude/settings.json</code> has no effect on an already-running session until one of those happens.</p>
