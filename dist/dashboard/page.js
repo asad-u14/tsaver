@@ -12,6 +12,7 @@ export function renderPage() {
   .tile { background: #15181f; border: 1px solid #262b35; border-radius: 8px; padding: 14px 18px; min-width: 140px; }
   .tile .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #8b93a3; margin-bottom: 6px; }
   .tile .value { font-size: 22px; font-weight: 600; }
+  .tile .value .sub-mb { font-size: 10px; font-weight: 400; color: #8b93a3; margin-left: 5px; }
   .tile.tile-highlight { border-color: #2f7a5f; background: #122019; }
   .tile.tile-highlight .value { color: #6ee7b7; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -44,16 +45,17 @@ async function load() {
   const tiles = document.getElementById('tiles');
   tiles.innerHTML = '';
   const tileData = [
-    ['Total entries', summary.totalEntries],
+    ['Total entries', summary.totalEntries.toLocaleString()],
     ['Approx. tokens saved', summary.wordsSaved.toLocaleString(), 'tile-highlight'],
-    ['Raw bytes', summary.rawBytes.toLocaleString()],
-    ['Filtered bytes', summary.filteredBytes.toLocaleString()],
+    ['Raw bytes', summary.rawBytes.toLocaleString(), '', summary.rawBytes],
+    ['Filtered bytes', summary.filteredBytes.toLocaleString(), '', summary.filteredBytes],
     ['Reduction', summary.reductionPct.toFixed(1) + '%'],
   ];
-  for (const [label, value, extraClass] of tileData) {
+  for (const [label, value, extraClass, bytesForMb] of tileData) {
     const el = document.createElement('div');
     el.className = 'tile' + (extraClass ? ' ' + extraClass : '');
-    el.innerHTML = '<div class="label">' + label + '</div><div class="value">' + value + '</div>';
+    const mbSuffix = bytesForMb !== undefined ? '<span class="sub-mb">(' + toMb(bytesForMb) + ' MB)</span>' : '';
+    el.innerHTML = '<div class="label">' + label + '</div><div class="value">' + value + mbSuffix + '</div>';
     tiles.appendChild(el);
   }
 
@@ -85,6 +87,10 @@ async function load() {
       '<td class="mono">' + tokensSaved.toLocaleString() + '</td>';
     rows.appendChild(tr);
   }
+}
+
+function toMb(bytes) {
+  return (bytes / (1024 * 1024)).toFixed(2);
 }
 
 function escapeHtml(s) {
