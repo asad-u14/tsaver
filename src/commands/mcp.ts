@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { compactJson } from "../mcpCompact.js";
 import { statsForText, printStats } from "../stats.js";
 import { saveEntry } from "../history.js";
+import { readMcpCache, writeMcpCache } from "../mcpCache.js";
 
 function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -39,16 +40,35 @@ export async function mcp(args: string[]): Promise<number> {
   const file = positional[0];
   const rawText = file ? readFileSync(file, "utf8") : await readStdin();
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawText);
-  } catch (err) {
-    process.stderr.write(`tsaver mcp: input is not valid JSON: ${(err as Error).message}\n`);
-    return 1;
+  // --pretty re-formats cached minified output on a hit rather than
+  // re-running compactJson, so the cache key intentionally excludes it —
+  // only maxString/maxArray change what compaction actually produces.
+  const cachedMinified = readMcpCache(rawText, maxString, maxArray);
+  let outputText: string;
+
+  if (cachedMinified !== null) {
+    let cachedValue: unknown;
+    try {
+      cachedValue = JSON.parse(cachedMinified);
+    } catch {
+      cachedValue = undefined;
+    }
+    outputText = pretty && cachedValue !== undefined ? JSON.stringify(cachedValue, null, 2) : cachedMinified;
+  } else {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (err) {
+      process.stderr.write(`tsaver mcp: input is not valid JSON: ${(err as Error).message}\n`);
+      return 1;
+    }
+
+    const compacted = compactJson(parsed, { maxString, maxArray });
+    const minified = JSON.stringify(compacted);
+    writeMcpCache(rawText, maxString, maxArray, minified);
+    outputText = pretty ? JSON.stringify(compacted, null, 2) : minified;
   }
 
-  const compacted = compactJson(parsed, { maxString, maxArray });
-  const outputText = pretty ? JSON.stringify(compacted, null, 2) : JSON.stringify(compacted);
   process.stdout.write(outputText + "\n");
 
   if (stats) {

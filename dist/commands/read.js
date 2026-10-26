@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
-import { statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { detectKind, readAsText } from "../fileopt/index.js";
 import { pdfToText } from "../fileopt/pdf.js";
 import { notebookToMarkdown } from "../fileopt/notebook.js";
 import { optimizeImage } from "../fileopt/image.js";
-import { writeCache } from "../fileopt/cache.js";
+import { readCacheIfFresh, writeCache } from "../fileopt/cache.js";
 import { statsForText, printStats } from "../stats.js";
 import { saveEntry } from "../history.js";
 export async function read(args) {
@@ -31,6 +31,42 @@ export async function read(args) {
     }
     const absPath = resolve(path);
     const kind = detectKind(absPath);
+    // Images are excluded: their "cache" redirect target is the resized image
+    // file itself, a separate mechanism from the text cache checked here, and
+    // optimizeImage is cheap enough relative to PDF/notebook parsing that the
+    // added staleness bookkeeping isn't worth it for that case.
+    if (cacheMode && kind !== "image") {
+        const freshCachePath = readCacheIfFresh(absPath);
+        if (freshCachePath) {
+            const cachedText = readFileSync(freshCachePath, "utf8");
+            const cachedStats = statsForText(cachedText);
+            // Use the real source file's on-disk size for "raw", same as a cold
+            // extraction would — a PDF's raw byte count is its binary size, not
+            // the already-extracted text's size, even when the extraction itself
+            // was skipped because the cache was still fresh.
+            const originalBytes = statSync(absPath).size;
+            if (stats) {
+                printStats({ lines: cachedStats.lines, bytes: originalBytes, words: cachedStats.words }, { lines: cachedStats.lines, bytes: cachedStats.bytes, words: cachedStats.words });
+            }
+            saveEntry({
+                kind: "read",
+                label: path,
+                stats: {
+                    rawLines: cachedStats.lines,
+                    filteredLines: cachedStats.lines,
+                    rawBytes: originalBytes,
+                    filteredBytes: cachedStats.bytes,
+                    rawWords: cachedStats.words,
+                    filteredWords: cachedStats.words,
+                },
+                source: process.env.TSAVER_HOOK_SOURCE ? "hook" : "manual",
+                rawPath: absPath,
+                filteredText: cachedText,
+            });
+            process.stdout.write(freshCachePath + "\n");
+            return 0;
+        }
+    }
     let outputText;
     let historyStats;
     // For images, the "cache" redirect target is the resized image file itself

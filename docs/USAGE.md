@@ -64,15 +64,20 @@ npm run build
 ## `tsaver run`
 
 ```
-tsaver run [--stats] -- <command> [args...]
+tsaver run [--stats] [--dedupe] -- <command> [args...]
 ```
 
 Spawns `<command>`, captures stdout/stderr, and streams each line through a **filter** before printing it — stripping noise while guaranteeing failures survive. Exit code is propagated unchanged.
 
+`--dedupe`: buffers the filtered output instead of streaming it live, and compares it (by content hash) against the same command's last run within the past 30 minutes. If unchanged, prints a one-line `(unchanged since last run of this command within the last 30 minutes)` note instead of repeating the full filtered output — useful for an agent re-running the same status/check command repeatedly in one session. Off by default, since buffering means output isn't visible until the command finishes.
+
 ### Filter selection order
 1. A custom `.toml` filter matching the command name (see [Custom filters](#custom-filters)).
-2. A built-in profile, if one exists for the command name: `pytest` / `py.test`, `npm`.
+2. A built-in profile, if one exists for the command name: `pytest` / `py.test`, `npm`, `cargo`, `go`, `git`.
 3. Otherwise, the **generic filter** (fallback).
+
+### Adaptive filter disabling
+If an agent calls `tsaver retrieve <id>` to recover a built-in filter's full original output **3 or more times**, that filter is treated as net-negative for the current situation — its compaction is costing an extra round-trip to undo — so it's automatically bypassed (unfiltered passthrough, recorded in history as e.g. `npm (disabled)`) for 24 hours, then re-enabled automatically. This only applies to built-in profiles, not the generic fallback (disabling generic would silently stop filtering every unmatched command, not just the one being retrieved).
 
 ### Generic filter behavior
 - Always keeps the **first 5 lines** and the **last 20 lines** of output.
@@ -88,7 +93,16 @@ Spawns `<command>`, captures stdout/stderr, and streams each line through a **fi
 - A real pytest example (25 lines) reduces to 12 lines / 71.1% fewer bytes with this filter — see the [Boost comparison report](boost-comparison-report.html) for a verified line-by-line diff against a published reference output.
 
 ### `npm` profile
-Keeps `npm error`/`npm ERR!`/`npm warn`/install-summary lines and anything matching `error|fail`. Drops `npm notice`/`npm timing`/spinner lines. Appends a marker if the process exits non-zero.
+Drops `npm notice`/`npm timing`/spinner lines. Everything else (including `npm warn`/`npm error` lines) goes through the same repeat-collapser as the custom-filter fallback, so a deprecation warning repeated 40 times collapses to one `(×40)` line while a one-off warning or error is never delayed or hidden. Appends a marker if the process exits non-zero and this stream saw output.
+
+### `cargo` profile
+Drops the per-dependency `Updating`/`Locking`/`Adding`/`Downloading`/`Downloaded`/`Compiling` lines cargo prints for every crate in the build (often dozens on a cold build). Keeps warnings, errors, the `Finished ... target(s) in N.NNs` summary, and `test result: ...` lines untouched; repeated non-noise lines are collapsed the same way as the generic filter.
+
+### `go` profile
+Drops `=== RUN TestName` progress markers and `go: downloading`/`go: extracting` module-fetch noise. `--- PASS: TestName` lines are counted (not collapsed by exact match, since test names almost always differ) and summarized at flush as `(N passing tests collapsed)` — the same approach the pytest profile uses for `PASSED` lines. Keeps `--- FAIL: ...` lines, the final `PASS`/`FAIL` line, and the per-package `ok`/`FAIL  <module>  N.NNs` summary line untouched.
+
+### `git` profile
+Drops the boilerplate `(use "git ...")` hint lines `git status` prints under almost every section header, and intermediate `Counting/Compressing/Receiving/Resolving objects: NN%` progress ticks from clone/fetch/pull. Everything else (file lists, commit messages, diffs, errors) passes through unmodified.
 
 ### `--stats`
 Prints a before/after summary to **stderr** (so it doesn't pollute the piped stdout):
@@ -130,6 +144,8 @@ Optimizes a file for an agent to consume, dispatching by file extension:
 ### `--cache`
 Instead of printing the optimized content to stdout, writes it to `~/.tsaver/cache/<hash>.md` (or, for images, uses the already-written `.optimized.<ext>` sibling file) and prints **only that path** on stdout. This is what the [Claude Code Read hook](#tsaver-init---claude) uses internally to redirect a `Read` tool call — it's not generally needed for interactive use.
 
+For PDFs and notebooks, each cached extraction is recorded alongside a manifest of the source file's mtime and size. A later `--cache` call on the same path skips re-extraction entirely (and reports the same path) if the source hasn't changed since — relevant because the Claude Code Read hook can invoke `tsaver read --cache` on the same file repeatedly within one session. History still records a `read` entry on a cache hit, with the real original file size as "raw bytes" (not the already-extracted text's size). Doesn't apply to images, whose cache redirect is the resized image file itself.
+
 ### Examples
 ```bash
 tsaver read --stats report.pdf
@@ -154,6 +170,7 @@ Compacts a JSON document — e.g. a captured MCP tool response — while **guara
 - Objects with more than `--max-array` keys get the same treatment — first 3 and last 3 entries kept, the rest replaced with a single `"...(N more keys)"` marker key. This covers large object-keyed payloads (e.g. an npm registry response's `versions` map) that array-only truncation used to miss entirely.
 - Output is **minified by default** — no indentation, since nothing reading it needs to be human-formatted. Pass `--pretty` for indented output when debugging interactively.
 - If the input isn't valid JSON, tsaver reports the parse error and exits 1 without writing anything.
+- Identical input (same raw JSON text and the same `--max-string`/`--max-array` options) is cached — a repeated call skips recompacting entirely and reuses the stored result, useful for an agent polling the same MCP tool call repeatedly. `--pretty` doesn't affect the cache key, since it only changes formatting of an already-cached result.
 
 ### Examples
 ```bash
@@ -383,7 +400,7 @@ Every `run`, `read`, and `mcp` invocation writes one JSON file to `~/.tsaver/his
   kind: "run" | "read" | "mcp";
   label: string;               // command/file, truncated to one line + "...(+N more lines)" if long/multi-line
   exitCode?: number | null;    // run only — the wrapped command's exit code
-  filterName?: string;         // run only — which filter handled it: "generic" | "pytest" | "npm" | "custom:<name>"
+  filterName?: string;         // run only — which filter handled it: "generic" | "pytest" | "npm" | "cargo" | "go" | "git" | "custom:<name>"
   source?: "hook" | "manual";  // run and read — "hook" if a Claude Code PreToolUse hook triggered it, "manual" if you ran the tsaver command yourself
   stats: {
     rawLines, filteredLines, rawBytes, filteredBytes, rawWords, filteredWords: number;

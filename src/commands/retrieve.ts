@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { loadEntry } from "../history.js";
+import { recordRetrieval } from "../retrievalTracking.js";
 
 export async function retrieve(args: string[]): Promise<number> {
   const id = args[0];
@@ -15,6 +16,7 @@ export async function retrieve(args: string[]): Promise<number> {
   }
 
   if (entry.rawText !== undefined) {
+    recordRetrieval(entry.filterName);
     process.stdout.write(entry.rawText + "\n");
     return 0;
   }

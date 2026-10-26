@@ -331,15 +331,19 @@ npm install
 npm run build</code></pre>
 
   <h2 id="run">tsaver run</h2>
-  <span class="cmd-badge">tsaver run [--stats] -- &lt;command&gt; [args...]</span>
+  <span class="cmd-badge">tsaver run [--stats] [--dedupe] -- &lt;command&gt; [args...]</span>
   <p>Spawns <code>&lt;command&gt;</code>, captures stdout/stderr, and streams each line through a filter before printing it — stripping noise while guaranteeing failures survive. Exit code is propagated unchanged.</p>
+  <p><code>--dedupe</code>: buffers filtered output and compares it (by content hash) against the same command's last run within the past 30 minutes. If unchanged, prints a one-line note instead of repeating the full output — useful when an agent re-runs the same status/check command repeatedly in one session. Off by default, since buffering means output isn't visible until the command finishes.</p>
 
   <h3>Filter selection order</h3>
   <ol>
     <li>A custom <code>.toml</code> filter matching the command name.</li>
-    <li>A built-in profile, if one exists: <code>pytest</code> / <code>py.test</code>, <code>npm</code>.</li>
+    <li>A built-in profile, if one exists: <code>pytest</code> / <code>py.test</code>, <code>npm</code>, <code>cargo</code>, <code>go</code>, <code>git</code>.</li>
     <li>Otherwise, the generic filter (fallback).</li>
   </ol>
+
+  <h3>Adaptive filter disabling</h3>
+  <p>If a built-in filter's full original output is retrieved via <code>tsaver retrieve</code> <strong>3 or more times</strong>, that filter is bypassed (unfiltered passthrough) for 24 hours, then re-enables automatically. Shows as e.g. <code>npm (disabled)</code> in history. Doesn't apply to the generic fallback filter.</p>
 
   <h3>Generic filter behavior</h3>
   <ul>
@@ -359,7 +363,16 @@ npm run build</code></pre>
   <p>A real pytest example (25 lines) reduces to 12 lines / 71.1% fewer bytes — see the <a href="boost-comparison-report.html">Boost comparison report</a> for a verified line-by-line diff against a published reference output.</p>
 
   <h3><code>npm</code> profile</h3>
-  <p>Keeps <code>npm error</code>/<code>npm ERR!</code>/<code>npm warn</code>/install-summary lines and anything matching <code>error|fail</code>. Drops <code>npm notice</code>/<code>npm timing</code>/spinner lines.</p>
+  <p>Drops <code>npm notice</code>/<code>npm timing</code>/spinner lines. Everything else — including <code>npm warn</code>/<code>npm error</code> lines — goes through the same repeat-collapser as the generic filter, so a deprecation warning repeated 40 times collapses to one <code>(×40)</code> line while a one-off warning or error is never hidden.</p>
+
+  <h3><code>cargo</code> profile</h3>
+  <p>Drops the per-dependency <code>Updating</code>/<code>Locking</code>/<code>Adding</code>/<code>Downloading</code>/<code>Downloaded</code>/<code>Compiling</code> lines cargo prints for every crate (often dozens on a cold build). Keeps warnings, errors, the <code>Finished ... target(s) in N.NNs</code> summary, and <code>test result: ...</code> lines untouched.</p>
+
+  <h3><code>go</code> profile</h3>
+  <p>Drops <code>=== RUN TestName</code> progress markers and <code>go: downloading</code>/<code>go: extracting</code> module-fetch noise. <code>--- PASS: TestName</code> lines are counted and summarized at flush as <code>(N passing tests collapsed)</code>, the same approach the pytest profile uses — since test names almost always differ, exact-match collapsing alone wouldn't catch them. Keeps <code>--- FAIL: ...</code> lines and the final <code>PASS</code>/<code>FAIL</code>/<code>ok</code> summary line untouched.</p>
+
+  <h3><code>git</code> profile</h3>
+  <p>Drops the boilerplate <code>(use "git ...")</code> hint lines <code>git status</code> prints under every section, and intermediate <code>Counting/Compressing/Receiving/Resolving objects: NN%</code> progress ticks from clone/fetch/pull. Everything else passes through unmodified.</p>
 
   <h3><code>--stats</code></h3>
   <pre><code>tsaver stats
@@ -387,7 +400,7 @@ tsaver run -- cargo build</code></pre>
       <tr><td>anything else</td><td>Passthrough — prints as-is, 0% reduction, still logged.</td></tr>
     </tbody>
   </table>
-  <p><code>--cache</code>: writes the optimized content to <code>~/.tsaver/cache/&lt;hash&gt;.md</code> (or points at the <code>.optimized.&lt;ext&gt;</code> image file) and prints only that path — used internally by the <a href="#init-claude">Claude Code Read hook</a>, not generally needed interactively.</p>
+  <p><code>--cache</code>: writes the optimized content to <code>~/.tsaver/cache/&lt;hash&gt;.md</code> (or points at the <code>.optimized.&lt;ext&gt;</code> image file) and prints only that path — used internally by the <a href="#init-claude">Claude Code Read hook</a>, not generally needed interactively. For PDFs/notebooks, a repeated call on an unchanged source file (checked by mtime + size) skips re-extraction entirely and reuses the existing cache. Doesn't apply to images.</p>
   <pre><code>tsaver read --stats report.pdf
 tsaver read notebook.ipynb
 tsaver read screenshot.png</code></pre>
@@ -402,6 +415,7 @@ tsaver read screenshot.png</code></pre>
     <li>Objects with more than <code>--max-array</code> keys get the same treatment — first 3 and last 3 entries kept, rest replaced with a <code>"...(N more keys)"</code> marker key.</li>
     <li>Output is minified by default; pass <code>--pretty</code> for indented output.</li>
     <li>Invalid JSON input exits 1 with a parse error — nothing is written.</li>
+    <li>Identical input (same raw text + same <code>--max-string</code>/<code>--max-array</code>) is cached — a repeated call skips recompacting entirely.</li>
   </ul>
   <pre><code>curl -s https://api.example.com/big-response.json | tsaver mcp --stats
 tsaver mcp --stats --max-string 200 --max-array 10 response.json
@@ -546,7 +560,7 @@ drop = ["^progress"]</code></pre>
   kind: "run" | "read" | "mcp";
   label: string;                 // truncated to one line + "...(+N more lines)" if long
   exitCode?: number | null;      // run only — the wrapped command's exit code
-  filterName?: string;           // run only — "generic" | "pytest" | "npm" | "custom:&lt;name&gt;"
+  filterName?: string;           // run only — "generic" | "pytest" | "npm" | "cargo" | "go" | "git" | "custom:&lt;name&gt;"
   source?: "hook" | "manual";    // run and read — hook-triggered vs. you ran it yourself
   stats: { rawLines, filteredLines, rawBytes, filteredBytes, rawWords, filteredWords: number };
   rawText?: string;    // run/mcp — full original content, recoverable via retrieve

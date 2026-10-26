@@ -7,8 +7,10 @@ const PROGRESS_RE = /\r/;
 /** npm profile: keeps errors/warnings/install summary, drops notices/spinners/timing noise, collapses repeated lines. */
 export class NpmFilter implements Filter {
   private collapser = new RepeatCollapser();
+  private sawAnyLine = false;
 
   processLine(line: string, emit: Emit): void {
+    this.sawAnyLine = true;
     if (PROGRESS_RE.test(line) || DROP_RE.test(line)) return;
     // Keep-worthy lines (errors/warnings/install summary) still go through the
     // collapser rather than bypassing it — a single deprecation warning that
@@ -23,7 +25,7 @@ export class NpmFilter implements Filter {
   }
 
   onExit(exitCode: number | null, emit: Emit): void {
-    if (exitCode !== 0 && exitCode !== null) {
+    if (exitCode !== 0 && exitCode !== null && this.sawAnyLine) {
       emit(`--- npm exited with code ${exitCode} ---`);
     }
   }
