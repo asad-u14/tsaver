@@ -45,8 +45,10 @@ async function load() {
   const tiles = document.getElementById('tiles');
   tiles.innerHTML = '';
   const tileData = [
-    ['Total entries', summary.totalEntries.toLocaleString()],
+    ['Total tokens', summary.rawWords.toLocaleString()],
+    ['Used tokens', summary.filteredWords.toLocaleString()],
     ['Approx. tokens saved', summary.wordsSaved.toLocaleString(), 'tile-highlight'],
+    ['Total entries', summary.totalEntries.toLocaleString()],
     ['Raw bytes', summary.rawBytes.toLocaleString(), '', summary.rawBytes],
     ['Filtered bytes', summary.filteredBytes.toLocaleString(), '', summary.filteredBytes],
     ['Reduction', summary.reductionPct.toFixed(1) + '%'],
