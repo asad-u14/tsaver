@@ -1,0 +1,38 @@
+tsaver-side benchmark run — Tue Oct 27 08:43:21 +04 2026
+(cross-check only — see benchmarks/PLAN.md for the real test, which needs portal numbers)
+
+=== 1. Noisy test run (tsaver run) ===
+
+tsaver stats
+  lines                   82 -> 27  (67.1% reduction)
+  bytes                   3244 -> 1119  (65.5% reduction)
+  words (approx. tokens)  174 -> 72  (58.6% reduction)
+
+=== 2. Noisy build (tsaver run) ===
+
+tsaver stats
+  lines                   122 -> 8  (93.4% reduction)
+  bytes                   2844 -> 212  (92.5% reduction)
+  words (approx. tokens)  370 -> 29  (92.2% reduction)
+
+=== 3. MCP array-shaped JSON (tsaver mcp) ===
+
+tsaver stats
+  lines                   1 -> 1  (0.0% reduction)
+  bytes                   48556 -> 1206  (97.5% reduction)
+  words (approx. tokens)  2751 -> 69  (97.5% reduction)
+
+=== 4. MCP object-shaped JSON (tsaver mcp) ===
+
+tsaver stats
+  lines                   1 -> 1  (0.0% reduction)
+  bytes                   72274 -> 1584  (97.8% reduction)
+  words (approx. tokens)  1 -> 3  (-200.0% reduction)
+
+=== 5. Real PDF read (tsaver read) ===
+
+tsaver stats
+  lines                   34 -> 34  (0.0% reduction)
+  bytes                   2097152 -> 1805  (99.9% reduction)
+  words (approx. tokens)  231 -> 231  (0.0% reduction)
+

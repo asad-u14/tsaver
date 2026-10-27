@@ -45,6 +45,8 @@ rm -f "$(dirname "$(which node)")/tsaver"   # removes a leftover dangling symlin
 
 **Does it actually save tokens?** See [`docs/token-savings-report.html`](docs/token-savings-report.html) — six real, reproducible benchmarks with exact before/after numbers. See also [`docs/improvement-plan.html`](docs/improvement-plan.html) for what's been fixed since and what's still planned.
 
+**Want to measure it yourself, against real billed usage?** See [`benchmarks/PLAN.md`](benchmarks/PLAN.md) — a step-by-step plan (plus a harness script) for comparing with-tsaver vs. without-tsaver token usage on your own account's usage portal, not just tsaver's self-reported stats.
+
 ## License
 
 ISC
