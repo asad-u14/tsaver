@@ -252,6 +252,37 @@
     margin-bottom: 12px;
   }
 
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0 28px; }
+  .flow-step {
+    display: grid; grid-template-columns: 32px 1fr; gap: 14px;
+    padding: 2px 0 20px;
+  }
+  .flow-step:last-child { padding-bottom: 2px; }
+  .flow-num {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+    font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center;
+    position: relative; flex-shrink: 0;
+  }
+  .flow-step:not(:last-child) .flow-num::after {
+    content: ""; position: absolute; top: 32px; left: 50%; width: 1px; height: calc(100% + 4px);
+    background: var(--border-strong); transform: translateX(-50%);
+  }
+  .flow-step-title { font-weight: 700; font-size: 14.5px; margin-bottom: 4px; }
+  .flow-step p { margin: 0; }
+
+  .simple-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0 28px;
+  }
+  .simple-card {
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .simple-card .simple-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 8px; }
+  .simple-card p { margin: 0; font-size: 13.5px; color: var(--text2); line-height: 1.55; }
+  @media (max-width: 700px) {
+    .simple-grid { grid-template-columns: 1fr; }
+  }
+
   footer { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text3); font-size: 12.5px; }
 
   @media (max-width: 860px) {
@@ -273,6 +304,7 @@
   <div class="nav-group">
     <div class="nav-group-label">Getting started</div>
     <a href="#why">Why tsaver</a>
+    <a href="#how-it-saves-tokens">How it saves tokens</a>
     <a href="#install">Install</a>
     <a href="token-savings-report.html">Token savings report ↗</a>
     <a href="boost-comparison-report.html">vs. JFrog Boost ↗</a>
@@ -314,6 +346,79 @@
   <p>The same problem shows up in other forms: an MCP tool can return a JSON blob with megabytes of nested data when only a handful of fields are relevant; a PDF or Jupyter notebook an agent needs to read might be mostly formatting and binary overhead; a repo-wide grep for "where is this function used" burns several tool calls that a small local index could answer in one.</p>
   <p>tsaver sits between the agent and all of that noise. It wraps the commands an agent runs, compacts the data it reads, and keeps everything that got filtered out recoverable on disk — so you get the token savings without ever losing information for good. It runs entirely locally: no data leaves your machine, there's no telemetry, and nothing needs a network connection to work.</p>
   <p><strong>Who this is for:</strong> anyone running Claude Code (or another agent) against a real codebase, where routine commands — installs, test suites, builds, API calls — are quietly eating context on noise instead of signal. If you've ever watched an agent's context fill up with <code>PASSED</code> lines or spinner frames, that's the problem tsaver is built to fix.</p>
+
+  <h2 id="how-it-saves-tokens">How it saves tokens, in simple words</h2>
+  <p class="subtitle" style="margin-bottom: 20px;">No jargon version: what tsaver actually does, step by step, and what it's built from.</p>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div>
+        <div class="flow-step-title">The agent asks for something</div>
+        <p>Claude Code runs a shell command (<code>npm test</code>, <code>git status</code>), reads a file (a PDF, a notebook), or gets a JSON response back from an MCP tool.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div>
+        <div class="flow-step-title">tsaver quietly sits in the middle</div>
+        <p>Instead of that raw output going straight to the agent, it passes through tsaver first — either because you explicitly ran <code>tsaver run</code>/<code>read</code>/<code>mcp</code>, or because <code>tsaver init --claude</code> set up a hook that reroutes it automatically, with no change to how you work.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div>
+        <div class="flow-step-title">tsaver throws away the noise, keeps the signal</div>
+        <p>It looks at the content line by line (or field by field for JSON, cell by cell for notebooks) and decides what actually matters: real errors, failures, summaries, and distinct content always survive. Repeated lines, progress bars, startup banners, and oversized blobs get collapsed or trimmed.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div>
+        <div class="flow-step-title">The agent only sees the short version</div>
+        <p>What actually reaches the agent's context is the trimmed-down result — often 80-99% smaller than the original, depending on how repetitive the original output was.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div>
+        <div class="flow-step-title">Nothing is ever truly lost</div>
+        <p>Every original, unfiltered version is saved to disk first. If the short version isn't enough, <code>tsaver retrieve &lt;id&gt;</code> brings back exactly what was removed — so trimming the agent's view never means the information is gone for good.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>What it actually uses to decide what to cut</h3>
+  <div class="simple-grid">
+    <div class="simple-card">
+      <div class="simple-label">Pattern matching</div>
+      <p>Each command type (pytest, npm, git, a JSON blob) has its own small set of rules for "this line/field is noise" vs. "this is signal" — built from studying what that tool's real output actually looks like, not guesses.</p>
+    </div>
+    <div class="simple-card">
+      <div class="simple-label">Repeat detection</div>
+      <p>The same line (or the same shape of a multi-line error) repeated many times in a row collapses into one copy plus a count — the information that "this happened 40 times" survives without printing it 40 times.</p>
+    </div>
+    <div class="simple-card">
+      <div class="simple-label">Size limits</div>
+      <p>Very long strings, very long arrays, and very large JSON objects get capped — keeping the start and end so you can see the shape, instead of the whole thing. A dense encoded string (like an embedded image) gets cut even harder, since it costs more tokens per character than normal text.</p>
+    </div>
+  </div>
+  <p>Nothing here calls out to another AI model or any external service to do this trimming — it's all plain pattern-matching logic running locally, which is also why it's fast and free to run as often as you want.</p>
+
+  <h3>What it's actually built from</h3>
+  <p>For the curious — the technical stack behind the simple version above. tsaver is a small <strong>TypeScript / Node.js</strong> CLI with a deliberately short dependency list:</p>
+  <table>
+    <thead><tr><th>Piece</th><th>What it's used for</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Regular expressions</strong> (built into JS, no library)</td><td>The actual "is this line noise or signal" decisions for every command filter — pytest, npm, cargo, go, git, and the generic fallback.</td></tr>
+      <tr><td><code>pdf-parse</code></td><td>Extracts plain text from the binary structure of a PDF.</td></tr>
+      <tr><td><code>jimp</code></td><td>Decodes and resizes images (PNG/JPEG/GIF/WebP) entirely in JS, no native image libraries.</td></tr>
+      <tr><td><code>smol-toml</code></td><td>Parses the <code>.toml</code> files behind <a href="#custom-filters">custom filters</a>.</td></tr>
+      <tr><td>Node's built-in <code>child_process</code> + <code>readline</code></td><td>Runs the wrapped command and streams its output line-by-line, so a filter never has to hold the entire output in memory at once before deciding what to keep.</td></tr>
+      <tr><td>Flat JSON files on disk (<code>~/.tsaver/</code>)</td><td>History, caches, and the retrieval/dedup tracking tsaver uses to know "have I seen this exact output before" — no database, nothing running in the background.</td></tr>
+    </tbody>
+  </table>
+  <p>That's deliberately the whole list — see <a href="improvement-plan.html">the improvement plan</a>'s language section for why a heavier runtime (compiled Go/Rust, a real tokenizer library) wasn't the right call for what tsaver actually does.</p>
 
   <h2 id="install">Install</h2>
   <pre><code>git clone https://github.com/asad-u14/tsaver.git
