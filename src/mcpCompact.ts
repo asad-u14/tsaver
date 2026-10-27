@@ -1,3 +1,5 @@
+import { looksDenseEncoded } from "./tokenEstimate.js";
+
 export interface CompactOptions {
   maxString?: number;
   maxArray?: number;
@@ -7,10 +9,19 @@ const DEFAULT_MAX_STRING = 500;
 const DEFAULT_MAX_ARRAY = 20;
 const ARRAY_EDGE_KEEP = 3;
 
+// base64/hex/binary-ish strings (image blobs, hashes, tokens — all common in
+// real MCP payloads) cost roughly 3x more tokens per character than prose,
+// so the same maxString allowance that's reasonable for English text is far
+// too generous for this content type. This caps dense-encoded strings much
+// harder regardless of maxString, since a user raising maxString for their
+// prose-heavy payload shouldn't also mean "let a 50KB base64 blob through."
+const DENSE_ENCODED_MAX_CHARS = 120;
+
 function compactString(value: string, maxString: number): string {
-  if (value.length <= maxString) return value;
-  const kept = value.slice(0, maxString);
-  return `${kept}...(${value.length - maxString} more chars)`;
+  const effectiveMax = looksDenseEncoded(value) ? Math.min(maxString, DENSE_ENCODED_MAX_CHARS) : maxString;
+  if (value.length <= effectiveMax) return value;
+  const kept = value.slice(0, effectiveMax);
+  return `${kept}...(${value.length - effectiveMax} more chars)`;
 }
 
 function compactArray(value: unknown[], opts: Required<CompactOptions>): unknown[] {

@@ -351,7 +351,7 @@ npm run build</code></pre>
     <li>Always keeps the first <strong>5</strong> lines and the last <strong>20</strong> lines of output.</li>
     <li>Collapses <strong>3 or more</strong> consecutive near-duplicate lines (digits normalized before comparing) into one line with a <code>(×N)</code> suffix.</li>
     <li>Drops progress-bar/spinner lines (carriage returns, <code>[===&gt;   ] 42%</code>, bare <code>NN% |</code>).</li>
-    <li>Always keeps lines matching <code>/\b(error|fail(?:ed|ure)?|exception|traceback)\b/i</code>.</li>
+    <li>Always keeps lines matching <code>/\b(error|fail(?:ed|ure)?|exception|traceback)\b/i</code> — and when such a line is followed by indented stack-trace continuation lines (<code>at ...</code> / <code>File "...", line N</code>), collapses <strong>2 or more</strong> structurally-identical consecutive blocks (same shape after masking quoted strings/hex/digits) into one block plus a repeat count.</li>
     <li>On non-zero exit, appends any last-20-window lines not already emitted under a <code>--- last lines before exit ---</code> marker.</li>
   </ul>
 
@@ -360,6 +360,7 @@ npm run build</code></pre>
     <li>Drops the entire startup banner (<code>test session starts</code>, <code>platform</code>, <code>rootdir</code>, <code>configfile</code>, <code>plugins</code>, <code>collected N items</code>) — none of it is test-specific signal.</li>
     <li>Recognizes pytest's real default-mode progress lines (a file path + status characters + optional <code>[ NN%]</code>, e.g. <code>tests/test_auth.py .......... [ 14%]</code>) and collapses them with <code>PASSED</code> lines into a single <code>N passed</code> note.</li>
     <li>Keeps <code>FAILED</code>, <code>ERROR</code>, <code>E </code> (assertion detail), and the summary line — stripping <code>===</code>/<code>___</code> decoration around headers to just the label, and removing blank lines orphaned by a drop.</li>
+    <li><strong>Multiple failures with the same exception type and traceback shape (different test names/line numbers/values) collapse into one block</strong> plus a note; the test name is masked in the comparison since it's expected to differ. The one-line <code>FAILED &lt;test&gt; - &lt;detail&gt;</code> short-summary entries always stay individual.</li>
   </ul>
   <p>A real pytest example (25 lines) reduces to 12 lines / 71.1% fewer bytes — see the <a href="boost-comparison-report.html">Boost comparison report</a> for a verified line-by-line diff against a published reference output.</p>
 
@@ -415,6 +416,7 @@ tsaver read --query "error" build-log.ipynb</code></pre>
   <p>Compacts a JSON document — e.g. a captured MCP tool response — while <strong>guaranteeing the output stays valid JSON</strong>. Reads from <code>file</code> if given, otherwise stdin.</p>
   <ul>
     <li>Strings longer than <code>--max-string</code> (default <strong>500</strong>) truncated with an inline <code>"...(N more chars)"</code> suffix.</li>
+    <li><strong>Dense-encoded strings</strong> (base64/hex-like: no whitespace, charset limited to letters/digits/<code>+/=_-</code>) are capped much harder — <strong>120 chars</strong>, or <code>--max-string</code> if lower — since they cost ~3x more tokens per character than prose. URLs and other punctuation-bearing strings are unaffected.</li>
     <li>Arrays longer than <code>--max-array</code> (default <strong>20</strong>) keep the first 3 and last 3 items, splicing in a <code>"...(N more items)"</code> marker.</li>
     <li>Objects with more than <code>--max-array</code> keys get the same treatment — first 3 and last 3 entries kept, rest replaced with a <code>"...(N more keys)"</code> marker key.</li>
     <li>Output is minified by default; pass <code>--pretty</code> for indented output.</li>

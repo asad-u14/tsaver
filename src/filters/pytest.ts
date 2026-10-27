@@ -1,4 +1,5 @@
 import type { Emit, Filter } from "./types.js";
+import { BlockRepeatCollapser } from "./blockRepeat.js";
 
 const KEEP_RE = /^(FAILED|ERROR|E\s)/;
 const SUMMARY_RE = /^=+.*(failed|passed|error).*=+$/i;
@@ -35,7 +36,7 @@ function countChar(line: string, char: string): number {
   return line.split("").filter((c) => c === char).length;
 }
 
-/** pytest profile: keeps failures/errors/assertion diffs/summary, collapses passing/progress/banner noise. */
+/** pytest profile: keeps failures/errors/assertion diffs/summary, collapses passing/progress/banner noise, and collapses structurally-identical failure blocks. */
 export class PytestFilter implements Filter {
   private passedCount = 0;
   private keptAnything = false;
@@ -44,15 +45,39 @@ export class PytestFilter implements Filter {
   // block's trailing blank) can be dropped too — while a genuine blank line
   // that follows kept content (e.g. after a test-name header) still survives.
   private previousLineDropped = false;
+  // A real `____ test_name ____` header marks the start of one failure's
+  // block — exact-match RepeatCollapser can't group these (test names,
+  // line numbers, and assertion values all differ between failures), but
+  // two failures raising the same exception type with the same traceback
+  // shape are still worth collapsing. Everything emitted between one
+  // header and the next belongs to that block.
+  private blocks = new BlockRepeatCollapser();
 
   private drop(): void {
     this.previousLineDropped = true;
   }
 
-  private keep(line: string, emit: Emit): void {
+  // Lines that don't belong to any failure block (section headers, the
+  // short-summary FAILED lines, the final result line) — these flush
+  // whatever block was open and are emitted directly, never fed into the
+  // block collapser, so they can't corrupt a block's structural signature.
+  private keepOutsideBlock(line: string, emit: Emit): void {
     this.keptAnything = true;
     this.previousLineDropped = false;
+    this.blocks.exitBlockContext(emit);
     emit(stripDecoration(line));
+  }
+
+  // Lines that are part of the current failure's traceback body — fed into
+  // the block collapser so structurally-identical failures can be grouped.
+  private keepInBlock(line: string, emit: Emit): void {
+    this.keptAnything = true;
+    this.previousLineDropped = false;
+    const stripped = stripDecoration(line);
+    if (UNDERSCORE_HEADER_RE.test(line)) {
+      this.blocks.startBlock(emit);
+    }
+    this.blocks.pushLine(stripped);
   }
 
   processLine(line: string, emit: Emit): void {
@@ -66,8 +91,26 @@ export class PytestFilter implements Filter {
       return;
     }
 
-    if (SUMMARY_RE.test(line) || KEEP_RE.test(line)) {
-      this.keep(line, emit);
+    // Any standalone "=== label ===" section header (not just the specific
+    // failed/passed/error summary line SUMMARY_RE catches) marks a
+    // transition between sections — e.g. "=== FAILURES ===" opens the
+    // failures section, "=== short test summary info ===" closes it — so
+    // it must exit block context too, the same as SUMMARY_RE lines.
+    if (SUMMARY_RE.test(line) || EQUALS_HEADER_RE.test(line)) {
+      this.keepOutsideBlock(line, emit);
+      return;
+    }
+
+    // A one-line "FAILED path::test - detail" short-summary entry (no
+    // leading whitespace, no underscore-header) is distinct from the `E `/
+    // traceback lines that make up a failure's body — the latter belong
+    // in the block, the former is its own standalone line.
+    if (KEEP_RE.test(line)) {
+      if (/^FAILED\b/.test(line)) {
+        this.keepOutsideBlock(line, emit);
+      } else {
+        this.keepInBlock(line, emit);
+      }
       return;
     }
 
@@ -83,10 +126,11 @@ export class PytestFilter implements Filter {
       return;
     }
 
-    this.keep(line, emit);
+    this.keepInBlock(line, emit);
   }
 
   flush(emit: Emit): void {
+    this.blocks.flush(emit);
     if (this.passedCount > 0 && !this.keptAnything) {
       emit(`${this.passedCount} passed`);
     } else if (this.passedCount > 0) {

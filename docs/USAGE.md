@@ -86,13 +86,14 @@ If an agent calls `tsaver retrieve <id>` to recover a built-in filter's full ori
 - Always keeps the **first 5 lines** and the **last 20 lines** of output.
 - Collapses **3 or more** consecutive near-duplicate lines (digits normalized to `#` before comparing) into one line with a `(×N)` suffix.
 - Drops lines matching progress-bar/spinner patterns: carriage returns, `[===>   ] 42%`, or a bare `NN% |`.
-- Always keeps any line matching `/\b(error|fail(?:ed|ure)?|exception|traceback)\b/i`.
+- Always keeps any line matching `/\b(error|fail(?:ed|ure)?|exception|traceback)\b/i` — and, when an error line is immediately followed by indented stack-trace continuation lines (`    at ...` / `File "...", line N`), treats the whole run as one block and collapses **2 or more** structurally-identical consecutive blocks (same shape after masking quoted strings, hex tokens, and digits) into one representative block plus `(previous block repeated N more times with the same structure)` — e.g. the same connection-timeout error repeated for different request numbers.
 - If the process exits non-zero, appends any of the last-20-window lines that weren't already emitted, under a `--- last lines before exit (non-zero exit code) ---` marker — so failure context is never silently dropped.
 
 ### `pytest` profile
 - Drops the entire startup banner (`test session starts`, `platform`, `rootdir`, `configfile`, `plugins`, `collected N items`) — none of it is test-specific signal.
 - Recognizes pytest's real default-mode progress lines (a file path followed by status characters and an optional `[ NN%]` marker, e.g. `tests/test_auth.py .......... [ 14%]`) and collapses them, along with `PASSED` lines, into a single `N passed` (or `(N passing tests collapsed)`) note.
 - Keeps lines starting with `FAILED`, `ERROR`, `E ` (assertion detail), and the summary line (`N failed, M passed`) — with the `===`/`___` decoration around section headers and summaries stripped to just the label, and blank lines orphaned by a drop removed.
+- **Multiple test failures with the same exception type and traceback shape (but different test names, line numbers, or assertion values) are collapsed into one representative failure block** plus a note — the test name itself is masked in the shape comparison (it's expected to differ), so two failures named differently but raising the same kind of error with the same structure still collapse, while a failure with a genuinely different exception type stays separate. The one-line `FAILED <test> - <detail>` short-summary entries are always kept individually, since those are exactly the distinguishing facts worth keeping even when the full tracebacks collapse.
 - A real pytest example (25 lines) reduces to 12 lines / 71.1% fewer bytes with this filter — see the [Boost comparison report](boost-comparison-report.html) for a verified line-by-line diff against a published reference output.
 
 ### `npm` profile
@@ -179,6 +180,7 @@ tsaver mcp [--stats] [--pretty] [--max-string N] [--max-array N] [file]
 Compacts a JSON document — e.g. a captured MCP tool response — while **guaranteeing the output stays valid JSON**. Reads from `file` if given, otherwise stdin.
 
 - Strings longer than `--max-string` (default **500**) are truncated with an inline `"...(N more chars)"` suffix.
+- **Dense-encoded strings (base64/hex/binary-ish — no whitespace, charset limited to letters/digits/`+/=_-`) are truncated much harder: 120 chars, or `--max-string` if lower, regardless of the default 500.** These cost roughly 3x more tokens per character than prose (measured against a real BPE tokenizer: ~1.5 chars/token for base64 vs. ~5.5 for English text), so the same character allowance that's reasonable for a text field is far too generous for an embedded image blob, hash, or token. Ordinary strings — including URLs, which contain `:`/`.`/`/` outside the dense charset — are unaffected and keep the normal `--max-string` limit.
 - Arrays longer than `--max-array` (default **20**) keep the **first 3 and last 3** items and splice in a single string marker (`"...(N more items)"`) describing how many were dropped.
 - Objects with more than `--max-array` keys get the same treatment — first 3 and last 3 entries kept, the rest replaced with a single `"...(N more keys)"` marker key. This covers large object-keyed payloads (e.g. an npm registry response's `versions` map) that array-only truncation used to miss entirely.
 - Output is **minified by default** — no indentation, since nothing reading it needs to be human-formatted. Pass `--pretty` for indented output when debugging interactively.

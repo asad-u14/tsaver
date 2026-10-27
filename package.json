@@ -12,7 +12,12 @@
     "start": "tsx src/cli.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["cli", "token-saver", "ai-agent", "claude-code"],
+  "keywords": [
+    "cli",
+    "token-saver",
+    "ai-agent",
+    "claude-code"
+  ],
   "license": "ISC",
   "engines": {
     "node": ">=18"
