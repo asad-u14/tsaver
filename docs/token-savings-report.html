@@ -288,6 +288,42 @@
     <tbody id="comparison-table"></tbody>
   </table>
 
+  <h2 id="portal-validation">Real-world validation: actual billed cost, read off the usage portal</h2>
+  <p class="section-dek">Everything above is tsaver's own self-reported <code>--stats</code> output. This section is the independent cross-check: the same 5 scenarios (noisy tests, noisy build, MCP array JSON, MCP object JSON, PDF read), each run as a fresh Claude Code session with no prior conversation history, once with the <code>PreToolUse</code> hooks removed from <code>settings.json</code> ("without tsaver") and once with them restored ("with tsaver"). The numbers below are the account's billed cost before and after each block of 5 runs, read directly from the usage portal — not estimated, not self-reported by tsaver.</p>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Portal cost, without tsaver</div>
+      <div class="kpi-value">$0.7564</div>
+      <div class="kpi-sub">from the usage portal, not tsaver's own stats — delta 279.5194 → 280.2758</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Portal cost, with tsaver</div>
+      <div class="kpi-value good">$0.3708</div>
+      <div class="kpi-sub">from the usage portal, not tsaver's own stats — delta 280.2758 → 280.6466</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Cost reduction (portal-measured)</div>
+      <div class="kpi-value good">50.98%</div>
+      <div class="kpi-sub">$0.3856 saved — billed cost, not a tsaver-reported number</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Correctness</div>
+      <div class="kpi-value good">5 / 5</div>
+      <div class="kpi-sub">all answers correct, with and without</div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>Run block</th><th class="num">Portal cost before ($)</th><th class="num">Portal cost after ($)</th><th class="num">Cost for block ($)</th></tr></thead>
+    <tbody>
+      <tr><td>Without tsaver (5 scenarios)</td><td class="num">279.5194</td><td class="num">280.2758</td><td class="num">0.7564</td></tr>
+      <tr><td>With tsaver (5 scenarios)</td><td class="num">280.2758</td><td class="num">280.6466</td><td class="num">0.3708</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note"><strong>Every number in this section is read from the Claude usage/billing portal</strong> — the account's actual before/after cost, not a value tsaver itself reported. This is one run of each condition, with all 5 scenarios blended into a single portal cost delta rather than broken out per scenario — the portal has no API to pull per-session numbers automatically, so this is one data point, not a statistically robust measurement. The <strong>50.98%</strong> blended reduction is lower than several of the per-scenario <em>self-reported</em> byte-reduction numbers above (65–99.9%) because this run mixes scenarios with very different savings potential (PDF read: ~99.9% claimed; noisy test/build: ~65–93% claimed) into one combined cost number, and because real token billing includes fixed overhead (system prompt, tool schemas) that doesn't shrink no matter how much tsaver trims a single tool result.</div>
+
   <h2 id="scenarios">What each scenario actually was</h2>
 
   <h3>1. Noisy test run (<code>./noisy-tests.sh</code>)</h3>
