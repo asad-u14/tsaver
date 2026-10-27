@@ -1,16 +1,28 @@
 import { resolve } from "node:path";
 import { readFileSync, statSync } from "node:fs";
-import { detectKind, readAsText } from "../fileopt/index.js";
+import { detectKind, filterTextByQuery, readAsText } from "../fileopt/index.js";
 import { pdfToText } from "../fileopt/pdf.js";
 import { notebookToMarkdown } from "../fileopt/notebook.js";
 import { optimizeImage } from "../fileopt/image.js";
 import { readCacheIfFresh, writeCache } from "../fileopt/cache.js";
 import { statsForText, printStats } from "../stats.js";
 import { saveEntry } from "../history.js";
+function parsePageRange(spec) {
+    const match = /^(\d+)-(\d+)$/.exec(spec.trim());
+    if (!match)
+        return null;
+    const first = Number(match[1]);
+    const last = Number(match[2]);
+    if (first < 1 || last < first)
+        return null;
+    return { first, last };
+}
 export async function read(args) {
     let rest = args;
     let stats = false;
     let cacheMode = false;
+    let pages;
+    let query;
     for (;;) {
         if (rest[0] === "--stats") {
             stats = true;
@@ -20,22 +32,43 @@ export async function read(args) {
             cacheMode = true;
             rest = rest.slice(1);
         }
+        else if (rest[0] === "--pages") {
+            const parsed = rest[1] ? parsePageRange(rest[1]) : null;
+            if (!parsed) {
+                process.stderr.write(`tsaver read: --pages expects N-M (e.g. --pages 1-5), got "${rest[1] ?? ""}"\n`);
+                return 1;
+            }
+            pages = parsed;
+            rest = rest.slice(2);
+        }
+        else if (rest[0] === "--query") {
+            query = rest[1];
+            if (!query) {
+                process.stderr.write("tsaver read: --query requires a search term\n");
+                return 1;
+            }
+            rest = rest.slice(2);
+        }
         else {
             break;
         }
     }
     const path = rest[0];
     if (!path) {
-        process.stderr.write("Usage: tsaver read [--stats] [--cache] <path>\n");
+        process.stderr.write("Usage: tsaver read [--stats] [--cache] [--pages N-M] [--query <term>] <path>\n");
         return 1;
     }
     const absPath = resolve(path);
     const kind = detectKind(absPath);
+    // Partial extraction (--pages/--query) always does a fresh extraction —
+    // the cached copy is the full document, so a cache hit here would ignore
+    // the request and return the wrong (complete) content.
+    const usingPartialExtraction = pages !== undefined || query !== undefined;
     // Images are excluded: their "cache" redirect target is the resized image
     // file itself, a separate mechanism from the text cache checked here, and
     // optimizeImage is cheap enough relative to PDF/notebook parsing that the
     // added staleness bookkeeping isn't worth it for that case.
-    if (cacheMode && kind !== "image") {
+    if (cacheMode && kind !== "image" && !usingPartialExtraction) {
         const freshCachePath = readCacheIfFresh(absPath);
         if (freshCachePath) {
             const cachedText = readFileSync(freshCachePath, "utf8");
@@ -76,7 +109,9 @@ export async function read(args) {
     switch (kind) {
         case "pdf": {
             const originalBytes = statSync(absPath).size;
-            outputText = await pdfToText(absPath);
+            outputText = await pdfToText(absPath, pages);
+            if (query)
+                outputText = filterTextByQuery(outputText, query);
             if (!cacheMode)
                 process.stdout.write(outputText + "\n");
             const filtered = statsForText(outputText);
@@ -92,7 +127,7 @@ export async function read(args) {
         }
         case "notebook": {
             const originalText = readAsText(absPath);
-            outputText = notebookToMarkdown(absPath);
+            outputText = notebookToMarkdown(absPath, query);
             if (!cacheMode)
                 process.stdout.write(outputText + "\n");
             historyStats = textStats(originalText, outputText);
@@ -120,7 +155,7 @@ export async function read(args) {
         }
         default: {
             const originalText = readAsText(absPath);
-            outputText = originalText;
+            outputText = query ? filterTextByQuery(originalText, query) : originalText;
             if (!cacheMode)
                 process.stdout.write(outputText);
             historyStats = textStats(originalText, outputText);
@@ -138,8 +173,16 @@ export async function read(args) {
         filteredText: outputText,
     });
     if (cacheMode) {
-        const redirectPath = cacheRedirectPath ?? writeCache(absPath, outputText);
-        process.stdout.write(redirectPath + "\n");
+        // A partial extraction must never overwrite the full-document cache —
+        // doing so would make the next unqualified `--cache` call silently
+        // return this request's narrower slice instead of the whole document.
+        const redirectPath = cacheRedirectPath ?? (usingPartialExtraction ? null : writeCache(absPath, outputText));
+        if (redirectPath) {
+            process.stdout.write(redirectPath + "\n");
+        }
+        else {
+            process.stdout.write(outputText + "\n");
+        }
     }
     return 0;
 }

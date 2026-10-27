@@ -334,6 +334,7 @@ npm run build</code></pre>
   <span class="cmd-badge">tsaver run [--stats] [--dedupe] -- &lt;command&gt; [args...]</span>
   <p>Spawns <code>&lt;command&gt;</code>, captures stdout/stderr, and streams each line through a filter before printing it — stripping noise while guaranteeing failures survive. Exit code is propagated unchanged.</p>
   <p><code>--dedupe</code>: buffers filtered output and compares it (by content hash) against the same command's last run within the past 30 minutes. If unchanged, prints a one-line note instead of repeating the full output — useful when an agent re-runs the same status/check command repeatedly in one session. Off by default, since buffering means output isn't visible until the command finishes.</p>
+  <p><strong>Filtered output cap:</strong> regardless of filter, filtered output is capped at <strong>2,000 lines or 500,000 bytes</strong> — a watch-mode or long-running command has no other limit. Past the cap, a notice is appended and nothing further is emitted live; the raw side keeps accumulating in full, so <code>tsaver retrieve</code> always recovers everything.</p>
 
   <h3>Filter selection order</h3>
   <ol>
@@ -389,7 +390,7 @@ tsaver run --stats -- pytest
 tsaver run -- cargo build</code></pre>
 
   <h2 id="read">tsaver read</h2>
-  <span class="cmd-badge">tsaver read [--stats] [--cache] &lt;path&gt;</span>
+  <span class="cmd-badge">tsaver read [--stats] [--cache] [--pages N-M] [--query &lt;term&gt;] &lt;path&gt;</span>
   <p>Optimizes a file for an agent to consume, dispatching by extension:</p>
   <table>
     <thead><tr><th>Extension</th><th>Behavior</th></tr></thead>
@@ -400,10 +401,13 @@ tsaver run -- cargo build</code></pre>
       <tr><td>anything else</td><td>Passthrough — prints as-is, 0% reduction, still logged.</td></tr>
     </tbody>
   </table>
-  <p><code>--cache</code>: writes the optimized content to <code>~/.tsaver/cache/&lt;hash&gt;.md</code> (or points at the <code>.optimized.&lt;ext&gt;</code> image file) and prints only that path — used internally by the <a href="#init-claude">Claude Code Read hook</a>, not generally needed interactively. For PDFs/notebooks, a repeated call on an unchanged source file (checked by mtime + size) skips re-extraction entirely and reuses the existing cache. Doesn't apply to images.</p>
+  <p><code>--pages N-M</code> (PDFs only): extracts just the given 1-indexed inclusive page range instead of the whole document. <code>--query &lt;term&gt;</code>: filters to matching lines/cells plus 2 lines of context (merging overlapping matches, marking gaps), for PDFs, notebooks, and plain text. Not applied to images.</p>
+  <p><code>--cache</code>: writes the optimized content to <code>~/.tsaver/cache/&lt;hash&gt;.md</code> (or points at the <code>.optimized.&lt;ext&gt;</code> image file) and prints only that path — used internally by the <a href="#init-claude">Claude Code Read hook</a>, not generally needed interactively. For PDFs/notebooks, a repeated call on an unchanged source file (checked by mtime + size) skips re-extraction entirely and reuses the existing cache. Doesn't apply to images. Combined with <code>--pages</code>/<code>--query</code>, prints the partial content directly instead of touching the cache — a partial result must never overwrite the full-document cache.</p>
   <pre><code>tsaver read --stats report.pdf
 tsaver read notebook.ipynb
-tsaver read screenshot.png</code></pre>
+tsaver read screenshot.png
+tsaver read --pages 1-5 big-report.pdf
+tsaver read --query "error" build-log.ipynb</code></pre>
   <p>History entry: <code>kind: "read"</code>, <code>rawPath</code> set to the original file (so <code>retrieve</code> re-reads it instead of duplicating its bytes).</p>
 
   <h2 id="mcp">tsaver mcp</h2>
@@ -500,6 +504,7 @@ tsaver history clear --force</code></pre>
 
   <h3>query</h3>
   <p>Exact case-sensitive match first; falls back to case-insensitive substring match if nothing matches exactly. Output grouped into <strong>Definitions</strong>, <strong>Imported by</strong>, and <strong>References</strong> (capped at 50 shown).</p>
+  <p><strong>References are ranked by usage before the cap is applied</strong> — a substring query can match several distinct symbol names at once, and each name's references are sorted by how many distinct files reference it (then by total reference count as a tiebreaker), so a widely-used symbol surfaces ahead of a one-off match within the same 50-reference cap, instead of whichever symbol happened to be scanned first.</p>
 
   <pre><code>tsaver graph build
 tsaver graph query selectFilter

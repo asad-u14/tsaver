@@ -71,6 +71,9 @@ Spawns `<command>`, captures stdout/stderr, and streams each line through a **fi
 
 `--dedupe`: buffers the filtered output instead of streaming it live, and compares it (by content hash) against the same command's last run within the past 30 minutes. If unchanged, prints a one-line `(unchanged since last run of this command within the last 30 minutes)` note instead of repeating the full filtered output — useful for an agent re-running the same status/check command repeatedly in one session. Off by default, since buffering means output isn't visible until the command finishes.
 
+### Filtered output cap
+Regardless of which filter runs, the **filtered** output a command can push is capped at **2,000 lines or 500,000 bytes**, whichever comes first — a long-running or watch-mode command with no natural quiet tail has no other limit on how much it pushes into an agent's context. Once hit, a `--- tsaver: filtered output exceeded the cap, rest dropped (use \`tsaver retrieve\` for the full original) ---` notice is appended and nothing further is emitted live. The **raw** side keeps accumulating in full regardless — `tsaver retrieve <id>` always recovers everything the command actually produced, capped output only affects what reaches the agent in real time.
+
 ### Filter selection order
 1. A custom `.toml` filter matching the command name (see [Custom filters](#custom-filters)).
 2. A built-in profile, if one exists for the command name: `pytest` / `py.test`, `npm`, `cargo`, `go`, `git`.
@@ -129,7 +132,7 @@ tsaver run -- cargo build
 ## `tsaver read`
 
 ```
-tsaver read [--stats] [--cache] <path>
+tsaver read [--stats] [--cache] [--pages N-M] [--query <term>] <path>
 ```
 
 Optimizes a file for an agent to consume, dispatching by file extension:
@@ -141,16 +144,26 @@ Optimizes a file for an agent to consume, dispatching by file extension:
 | `.png` `.jpg` `.jpeg` `.gif` `.webp` | Resizes (if larger than 1024px on the longest side) via `jimp` and writes `<name>.optimized.<ext>` alongside the original. Prints the new dimensions and before/after byte size. |
 | anything else | Passthrough — prints the file as-is, 0% reduction, still logged to history. |
 
+### `--pages N-M`
+PDFs only. Extracts only the given 1-indexed, inclusive page range (e.g. `--pages 1-5`) instead of the whole document — useful when an agent only needs one section of a large PDF. Invalid ranges (`last < first`, non-numeric) exit 1 with an error before any extraction happens.
+
+### `--query <term>`
+Filters the extracted/read content down to lines (or, for notebooks, cells) matching `<term>` (case-insensitive) plus 2 lines of surrounding context, merging overlapping matches and marking omitted gaps with `... (N lines omitted) ...`. Works for PDFs (applied after extraction), notebooks (matches against cell source or output text, keeping whole cells), and plain-text passthrough. No match prints `(no lines matching "<term>")` rather than nothing. Not applied to images.
+
 ### `--cache`
 Instead of printing the optimized content to stdout, writes it to `~/.tsaver/cache/<hash>.md` (or, for images, uses the already-written `.optimized.<ext>` sibling file) and prints **only that path** on stdout. This is what the [Claude Code Read hook](#tsaver-init---claude) uses internally to redirect a `Read` tool call — it's not generally needed for interactive use.
 
 For PDFs and notebooks, each cached extraction is recorded alongside a manifest of the source file's mtime and size. A later `--cache` call on the same path skips re-extraction entirely (and reports the same path) if the source hasn't changed since — relevant because the Claude Code Read hook can invoke `tsaver read --cache` on the same file repeatedly within one session. History still records a `read` entry on a cache hit, with the real original file size as "raw bytes" (not the already-extracted text's size). Doesn't apply to images, whose cache redirect is the resized image file itself.
+
+Combining `--cache` with `--pages`/`--query` prints the partial content directly instead of writing/returning a cache path — caching a partial extraction under the same key as the full document would make the next unqualified `--cache` call silently return the narrower slice instead of the whole document.
 
 ### Examples
 ```bash
 tsaver read --stats report.pdf
 tsaver read notebook.ipynb
 tsaver read screenshot.png
+tsaver read --pages 1-5 big-report.pdf       # only pages 1 through 5
+tsaver read --query "error" build-log.ipynb  # only cells/lines mentioning "error"
 ```
 
 History entry: `kind: "read"`, with `rawPath` set to the original absolute path (so [`retrieve`](#tsaver-retrieve) re-reads the file rather than duplicating its bytes into history).
@@ -316,6 +329,8 @@ Looks up a name against the last-built index:
 2. If nothing matches exactly, falls back to a case-insensitive substring match.
 
 Output is grouped into **Definitions** (kind, file:line), **Imported by** (which files import a module whose imported names matched, or whose module path substring-matches the query), and **References** (every other line where the symbol name appears as a whole word, capped at 50 shown).
+
+**References are ranked by usage before the 50-reference cap is applied.** A substring query can match several distinct symbol names at once (e.g. `Filter` matches `GenericFilter`, `NpmFilter`, `CargoFilter`, ...) — each name's references are sorted by how many distinct files reference it, then by total reference count as a tiebreaker, so a symbol used broadly across the codebase surfaces ahead of one used only in a single place, rather than whichever happened to be scanned first.
 
 ### Examples
 ```bash

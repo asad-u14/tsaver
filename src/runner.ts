@@ -12,6 +12,21 @@ export interface RunResult {
   filteredText: string;
   /** Present only when `bufferOutput` was requested — call to print the buffered output after deciding it should be shown. */
   flushBufferedOutput?: () => void;
+  /** True if filtered output hit MAX_FILTERED_LINES/MAX_FILTERED_BYTES and further lines were dropped before reaching the agent. */
+  truncated?: boolean;
+}
+
+// A long-running or watch-mode command (one that never naturally produces a
+// quiet, filterable tail) has no other limit on how much filtered output it
+// can push at the agent — a filter's reduction ratio doesn't help if the
+// absolute volume is still huge. These caps bound the live/filtered side
+// only; the raw side keeps accumulating so `tsaver retrieve` can still
+// recover everything that was actually produced.
+const MAX_FILTERED_LINES = 2000;
+const MAX_FILTERED_BYTES = 500_000;
+
+interface TruncationState {
+  truncated: boolean;
 }
 
 function pump(
@@ -22,9 +37,19 @@ function pump(
   rawChunks: string[],
   filteredChunks: string[],
   write: (chunk: string) => void,
+  truncation: TruncationState,
 ): Promise<void> {
   const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
   const emit = (line: string) => {
+    if (truncation.truncated) return;
+    if (filteredStats.lines >= MAX_FILTERED_LINES || filteredStats.bytes >= MAX_FILTERED_BYTES) {
+      truncation.truncated = true;
+      const notice = "--- tsaver: filtered output exceeded the cap, rest dropped (use `tsaver retrieve` for the full original) ---";
+      filteredStats.addLine(notice);
+      filteredChunks.push(notice);
+      write(notice + "\n");
+      return;
+    }
     filteredStats.addLine(line);
     filteredChunks.push(line);
     write(line + "\n");
@@ -66,8 +91,12 @@ export async function run(
   const writeStdout = options.bufferOutput ? (c: string) => stdoutBuffer.push(c) : (c: string) => process.stdout.write(c);
   const writeStderr = options.bufferOutput ? (c: string) => stderrBuffer.push(c) : (c: string) => process.stderr.write(c);
 
-  const stdoutDone = pump(child.stdout!, stdoutFilter, rawStats, filteredStats, rawChunks, filteredChunks, writeStdout);
-  const stderrDone = pump(child.stderr!, stderrFilter, rawStats, filteredStats, rawChunks, filteredChunks, writeStderr);
+  // Shared across both streams so the cap is on total filtered output, not
+  // double the limit via two independently-capped streams.
+  const truncation: TruncationState = { truncated: false };
+
+  const stdoutDone = pump(child.stdout!, stdoutFilter, rawStats, filteredStats, rawChunks, filteredChunks, writeStdout, truncation);
+  const stderrDone = pump(child.stderr!, stderrFilter, rawStats, filteredStats, rawChunks, filteredChunks, writeStderr, truncation);
 
   const exitCode: number | null = await new Promise((resolve) => {
     child.on("close", (code) => resolve(code));
@@ -104,5 +133,6 @@ export async function run(
           for (const c of stderrBuffer) process.stderr.write(c);
         }
       : undefined,
+    truncated: truncation.truncated,
   };
 }
